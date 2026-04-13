@@ -28,6 +28,10 @@ export default function App() {
         <Router>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/solutions" element={<LandingPage />} />
+            <Route path="/analytics" element={<LandingPage />} />
+            <Route path="/proof" element={<LandingPage />} />
+            <Route path="/contact" element={<LandingPage />} />
             <Route path="/request" element={<RequestForm />} />
             <Route path="/dashboard/*" element={<Dashboard />} />
           </Routes>

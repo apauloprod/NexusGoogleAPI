@@ -39,13 +39,16 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "apauloprod@gmail.com" && request.auth.token.email_verified == true));
+        ((request.auth.token.email == "apauloprod@gmail.com" && request.auth.token.email_verified == true) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isStaff() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
+        (isAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']));
     }
 
     function isValidEmail(email) {
@@ -60,7 +63,7 @@ service cloud.firestore {
       allow read, write: if isStaff();
     }
 
-    // Quotes, Jobs, Invoices, Clients: Admin/Staff only
+    // Quotes, Jobs, Invoices, Clients, Payments, Visits: Admin/Staff only
     match /quotes/{quoteId} {
       allow read, write: if isStaff();
     }
@@ -71,6 +74,12 @@ service cloud.firestore {
       allow read, write: if isStaff();
     }
     match /clients/{clientId} {
+      allow read, write: if isStaff();
+    }
+    match /payments/{paymentId} {
+      allow read, write: if isStaff();
+    }
+    match /visits/{visitId} {
       allow read, write: if isStaff();
     }
 
