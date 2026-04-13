@@ -1,5 +1,5 @@
 import { useEffect, useState, createContext, useContext } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "./firebase";
 import LandingPage from "./pages/LandingPage";
