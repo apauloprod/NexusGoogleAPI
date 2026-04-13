@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: requests
+    // Fields: name (string), email (string), phone (string), address (string), 
+    //         services (list), availability (string), notes (string), 
+    //         status (string: pending|quoted|archived), createdAt (timestamp)
+    //
+    // Collection: quotes
+    // Fields: requestId (string), clientId (string), items (list of maps), 
+    //         totalAmount (number), status (string: draft|sent|accepted|rejected), 
+    //         notes (string), createdAt (timestamp)
+    //
+    // Collection: jobs
+    // Fields: quoteId (string), clientId (string), title (string), 
+    //         scheduledDate (timestamp), isRecurring (bool), status (string), 
+    //         notes (string), checklists (list), photos (list)
+    //
+    // Collection: invoices
+    // Fields: jobId (string), clientId (string), amount (number), 
+    //         status (string: draft|sent|paid|overdue), dueDate (timestamp), createdAt (timestamp)
+    //
+    // Collection: clients
+    // Fields: name (string), email (string), phone (string), address (string), notes (string)
+    //
+    // Collection: users
+    // Fields: role (string: admin|staff), email (string)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "apauloprod@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isStaff() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Requests: Public can create, Admin/Staff can read/write
+    match /requests/{requestId} {
+      allow create: if request.resource.data.status == 'pending' &&
+                      request.resource.data.name is string &&
+                      isValidEmail(request.resource.data.email);
+      allow read, write: if isStaff();
+    }
+
+    // Quotes, Jobs, Invoices, Clients: Admin/Staff only
+    match /quotes/{quoteId} {
+      allow read, write: if isStaff();
+    }
+    match /jobs/{jobId} {
+      allow read, write: if isStaff();
+    }
+    match /invoices/{invoiceId} {
+      allow read, write: if isStaff();
+    }
+    match /clients/{clientId} {
+      allow read, write: if isStaff();
+    }
+
+    // Users: Admin can manage, users can read their own
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

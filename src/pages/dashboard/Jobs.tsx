@@ -1,0 +1,106 @@
+import React, { useState, useEffect } from "react";
+import { 
+  Plus, 
+  CheckSquare,
+  ArrowUpRight,
+  User as UserIcon,
+  Clock,
+  MessageSquare,
+  ImageIcon,
+  MoreVertical
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { db, handleFirestoreError, OperationType } from "../../firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+
+const Jobs = () => {
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setJobs(data);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "jobs");
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Completed</Badge>;
+      case 'on-hold':
+        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">On Hold</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Cancelled</Badge>;
+      default:
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">Active</Badge>;
+    }
+  };
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tighter">Jobs</h1>
+          <p className="text-muted-foreground">Track ongoing work, checklists, and project progress.</p>
+        </div>
+        <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+          <Plus className="h-4 w-4" />
+          New Job
+        </Button>
+      </div>
+
+      <div className="grid gap-4">
+        {loading ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground">Loading jobs...</div>
+        ) : jobs.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No active jobs found.</div>
+        ) : (
+          jobs.map((job) => (
+            <div key={job.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+              <div className="flex items-center gap-6">
+                <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                  <CheckSquare className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="font-bold text-lg">{job.title}</h3>
+                    {getStatusBadge(job.status)}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" /> {job.clientName}</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Last updated {job.updatedAt?.toDate().toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4 text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    <span className="text-xs">{job.notesCount || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <ImageIcon className="h-4 w-4" />
+                    <span className="text-xs">{job.photosCount || 0}</span>
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-white/5 mx-2" />
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                  <ArrowUpRight className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Jobs;

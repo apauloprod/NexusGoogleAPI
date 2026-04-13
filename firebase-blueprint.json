@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "Request": {
+      "title": "Request",
+      "description": "Initial customer request for a quote",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "services": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "quoted", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "status", "createdAt"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "A finalized quote sent to a customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "requestId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "items": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" }
+            }
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "sent", "accepted", "rejected"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requestId", "totalAmount", "status", "createdAt"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "A scheduled piece of work",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quoteId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "title": { "type": "string" },
+        "scheduledDate": { "type": "string", "format": "date-time" },
+        "isRecurring": { "type": "boolean" },
+        "recurrenceRule": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "in-progress", "completed", "cancelled"] },
+        "notes": { "type": "string" },
+        "checklists": { "type": "array", "items": { "type": "string" } },
+        "photos": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["title", "scheduledDate", "status"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "A bill for completed work",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "sent", "paid", "overdue"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "amount", "status", "createdAt"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Customer information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["name", "email"]
+    }
+  },
+  "firestore": {
+    "/requests/{requestId}": { "schema": "Request", "description": "Customer requests" },
+    "/quotes/{quoteId}": { "schema": "Quote", "description": "Finalized quotes" },
+    "/jobs/{jobId}": { "schema": "Job", "description": "Scheduled jobs" },
+    "/invoices/{invoiceId}": { "schema": "Invoice", "description": "Invoices" },
+    "/clients/{clientId}": { "schema": "Client", "description": "Customer records" }
+  }
+}

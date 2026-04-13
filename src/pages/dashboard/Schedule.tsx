@@ -1,0 +1,104 @@
+import React, { useState, useEffect } from "react";
+import { 
+  Plus, 
+  Calendar as CalendarIcon,
+  Clock,
+  MapPin,
+  User as UserIcon,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { db, handleFirestoreError, OperationType } from "../../firebase";
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+
+const Schedule = () => {
+  const [visits, setVisits] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    // In a real app, we'd filter by date range
+    const q = query(collection(db, "visits"), orderBy("scheduledAt", "asc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setVisits(data);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "visits");
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <div className="p-8">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tighter">Schedule</h1>
+          <p className="text-muted-foreground">View and manage your team's daily schedule and visits.</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="px-4 text-sm font-bold">
+              {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+            <Plus className="h-4 w-4" />
+            New Visit
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6">
+        {loading ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground">Loading schedule...</div>
+        ) : visits.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No visits scheduled for this period.</div>
+        ) : (
+          visits.map((visit) => (
+            <div key={visit.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group">
+              <div className="w-24 text-center border-r border-white/10 pr-6">
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
+                  {visit.scheduledAt?.toDate().toLocaleDateString('en-US', { weekday: 'short' })}
+                </p>
+                <p className="text-3xl font-bold mt-1">
+                  {visit.scheduledAt?.toDate().getDate()}
+                </p>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="font-bold text-xl">{visit.title}</h3>
+                  <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">
+                    {visit.status || 'Scheduled'}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {visit.scheduledAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="flex items-center gap-1.5"><UserIcon className="h-4 w-4" /> {visit.clientName}</span>
+                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {visit.address}</span>
+                </div>
+              </div>
+              <div className="flex -space-x-2">
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-8 w-8 rounded-full border-2 border-black bg-white/10 flex items-center justify-center text-[10px] font-bold">
+                    TM
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Schedule;
