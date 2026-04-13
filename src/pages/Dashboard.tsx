@@ -19,7 +19,8 @@ import {
   ArrowUpRight,
   User as UserIcon,
   Mail,
-  MapPin
+  MapPin,
+  LogIn
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +28,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { db, handleFirestoreError, OperationType } from "../firebase";
+import { db, auth, signInWithGoogle, logout, handleFirestoreError, OperationType } from "../firebase";
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { AuthContext } from "../App";
+import { useContext } from "react";
 
 // Import Dashboard Components
 import Requests from "./dashboard/Requests";
@@ -66,8 +69,39 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, to, active
 );
 
 export default function Dashboard() {
+  const { user, loading } = useContext(AuthContext);
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full bg-black flex items-center justify-center">
+        <div className="h-8 w-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen w-full bg-black flex flex-col items-center justify-center p-6 text-center">
+        <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center mb-8">
+          <div className="h-8 w-8 bg-black rounded-lg" />
+        </div>
+        <h1 className="text-3xl font-bold tracking-tighter mb-4">Welcome to Nexus</h1>
+        <p className="text-muted-foreground max-w-md mb-8">
+          Please log in with your authorized Google account to access your business dashboard.
+        </p>
+        <Button 
+          onClick={signInWithGoogle}
+          size="lg" 
+          className="bg-white text-black hover:bg-white/90 rounded-xl px-8 h-14 text-lg font-bold gap-3"
+        >
+          <LogIn className="h-5 w-5" />
+          Log in with Google
+        </Button>
+      </div>
+    );
+  }
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
@@ -129,13 +163,27 @@ export default function Dashboard() {
       </ScrollArea>
 
       <div className="p-4 border-t border-white/5">
-        <div className="flex items-center gap-3 px-2">
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/10" />
+        <div className="flex items-center gap-3 px-2 mb-4">
+          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt={user.displayName || ""} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+            ) : (
+              <UserIcon className="h-5 w-5 text-white/50" />
+            )}
+          </div>
           <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-bold text-white truncate">Business Owner</p>
-            <p className="text-xs text-muted-foreground truncate">owner@nexus.com</p>
+            <p className="text-sm font-bold text-white truncate">{user?.displayName || "User"}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>
+        <Button 
+          variant="ghost" 
+          onClick={logout}
+          className="w-full justify-start gap-3 h-11 px-4 rounded-xl text-muted-foreground hover:text-red-400 hover:bg-red-400/5 transition-colors"
+        >
+          <LogIn className="h-5 w-5 rotate-180" />
+          <span className="font-medium">Log out</span>
+        </Button>
       </div>
     </div>
   );

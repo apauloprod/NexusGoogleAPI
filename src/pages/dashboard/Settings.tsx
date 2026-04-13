@@ -103,10 +103,10 @@ const Settings = () => {
         createdAt: serverTimestamp()
       });
 
-      alert("Sample data seeded successfully!");
+      // Success feedback
+      console.log("Sample data seeded successfully!");
     } catch (error) {
       console.error("Error seeding data:", error);
-      alert("Failed to seed data. Check console for details.");
     } finally {
       setIsSeeding(false);
     }
@@ -193,11 +193,20 @@ const Settings = () => {
               <Button 
                 onClick={seedData} 
                 disabled={isSeeding}
-                className="bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl px-8 h-12 font-bold gap-2"
+                className={`rounded-xl px-8 h-12 font-bold gap-2 transition-all ${
+                  isSeeding 
+                    ? "bg-white/10 text-muted-foreground" 
+                    : "bg-emerald-500 text-white hover:bg-emerald-600"
+                }`}
               >
                 <Database className="h-4 w-4" />
-                {isSeeding ? "Seeding..." : "Seed Sample Data"}
+                {isSeeding ? "Seeding Database..." : "Seed Sample Data"}
               </Button>
+              {isSeeding && (
+                <p className="text-xs text-emerald-500 mt-2 animate-pulse">
+                  Connecting to Firestore and creating collections...
+                </p>
+              )}
             </div>
           </section>
         </div>
