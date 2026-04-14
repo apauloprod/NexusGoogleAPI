@@ -24,7 +24,11 @@ import {
 } from "@/components/ui/dialog";
 import { PaymentForm } from "../../components/forms/PaymentForm";
 
+import { useSearchParams } from "react-router-dom";
+
 const Payments = () => {
+  const [searchParams] = useSearchParams();
+  const success = searchParams.get("success");
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -44,6 +48,12 @@ const Payments = () => {
 
   return (
     <div className="p-8">
+      {success && (
+        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-500">
+          <CheckCircle2 className="h-5 w-5" />
+          <p className="font-bold">Payment processed successfully!</p>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tighter">Payments</h1>

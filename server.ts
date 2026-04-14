@@ -7,8 +7,11 @@ import { Resend } from "resend";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import dotenv from "dotenv";
+import Stripe from "stripe";
 
 dotenv.config();
+
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 console.log("SERVER SCRIPT LOADED");
 
@@ -95,6 +98,7 @@ async function startServer() {
 
       // 2. Send Email
       const approvalUrl = `${appUrl}/#/quote/${quote.id}/approve`;
+      const paymentUrl = `${appUrl}/#/pay?type=quote&id=${quote.id}`;
       
       const { data, error } = await resend.emails.send({
         from: "CRM <onboarding@resend.dev>", // Replace with your verified domain
@@ -109,7 +113,10 @@ async function startServer() {
               <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #000;">$${quote.total.toLocaleString()}</p>
             </div>
             <p style="color: #555; line-height: 1.6;">To proceed with this work, please click the button below to approve the quote online:</p>
-            <a href="${approvalUrl}" style="display: inline-block; background: #000; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">Approve Quote Online</a>
+            <div style="margin: 20px 0;">
+              <a href="${approvalUrl}" style="display: inline-block; background: #000; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px;">Approve Quote Online</a>
+              <a href="${paymentUrl}" style="display: inline-block; background: #fff; color: #000; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #000;">Pay Deposit</a>
+            </div>
             <p style="color: #888; font-size: 12px; margin-top: 30px;">If you have any questions, please reply to this email.</p>
           </div>
         `,
@@ -183,6 +190,8 @@ async function startServer() {
 
       // 2. Send Email
       console.log("[INVOICE API] Sending email via Resend...");
+      const paymentUrl = `${appUrl}/#/pay?type=invoice&id=${invoice.id}`;
+      
       const { data, error } = await resend.emails.send({
         from: "CRM <onboarding@resend.dev>",
         to: [clientEmail],
@@ -196,7 +205,8 @@ async function startServer() {
               <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #000;">$${(Number(invoice.total) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               <p style="margin: 10px 0 0; font-size: 12px; color: #888;">Due Date: ${dueDateStr}</p>
             </div>
-            <p style="color: #555; line-height: 1.6;">You can pay this invoice by replying to this email or following our standard payment procedures.</p>
+            <p style="color: #555; line-height: 1.6;">You can pay this invoice securely online by clicking the button below:</p>
+            <a href="${paymentUrl}" style="display: inline-block; background: #000; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">Pay Invoice Online</a>
             <p style="color: #888; font-size: 12px; margin-top: 30px;">Thank you for your business!</p>
           </div>
         `,
@@ -218,6 +228,41 @@ async function startServer() {
     } catch (err) {
       console.error("[INVOICE API] Unexpected error:", err);
       res.status(500).json({ error: "Failed to generate PDF or send email.", details: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.post("/api/create-checkout-session", async (req, res) => {
+    const { amount, currency, description, metadata, successUrl, cancelUrl } = req.body;
+
+    if (!stripe) {
+      return res.status(500).json({ error: "Stripe not configured. Please add STRIPE_SECRET_KEY to environment variables." });
+    }
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"], // You can add "paypal" here if enabled in Stripe
+        line_items: [
+          {
+            price_data: {
+              currency: currency || "usd",
+              product_data: {
+                name: description || "Service Payment",
+              },
+              unit_amount: Math.round(amount * 100), // Stripe expects cents
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        metadata: metadata || {},
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      });
+
+      res.json({ id: session.id, url: session.url });
+    } catch (err: any) {
+      console.error("Stripe Session Error:", err);
+      res.status(500).json({ error: err.message });
     }
   });
 

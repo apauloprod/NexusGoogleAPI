@@ -21,6 +21,21 @@ import {
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, increment } from "firebase/firestore";
 import { useState, useEffect } from "react";
+import { Check, ChevronsUpDown, CreditCard as StripeIcon, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const paymentSchema = z.object({
   invoiceId: z.string().min(1, "Please select an invoice"),
@@ -36,22 +51,6 @@ interface PaymentFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
-
-import { Check, ChevronsUpDown, Search } from "lucide-react"
-import { cn } from "@/lib/utils"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 
 export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,14 +86,12 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
       const selectedInvoice = invoices.find(i => i.id === values.invoiceId);
       
       if (initialData?.id) {
-        // Edit existing payment
         const paymentRef = doc(db, "payments", initialData.id);
         await updateDoc(paymentRef, {
           ...values,
           updatedAt: serverTimestamp(),
         });
 
-        // Update invoice if amount changed
         if (values.amount !== initialData.amount) {
           const invoiceRef = doc(db, "invoices", values.invoiceId);
           const diff = values.amount - initialData.amount;
@@ -104,7 +101,6 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
           });
         }
       } else {
-        // Record new payment
         await addDoc(collection(db, "payments"), {
           ...values,
           clientName: selectedInvoice?.clientName || "Unknown Client",
@@ -113,7 +109,6 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
           createdAt: serverTimestamp(),
         });
 
-        // Update the invoice paid amount and status
         const invoiceRef = doc(db, "invoices", values.invoiceId);
         const newPaidAmount = (selectedInvoice?.paidAmount || 0) + values.amount;
         const isPaid = newPaidAmount >= (selectedInvoice?.total || 0);
@@ -133,6 +128,50 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
       setIsSubmitting(false);
     }
   }
+
+  const handleStripePayment = async () => {
+    const values = form.getValues();
+    const amount = Number(values.amount);
+    if (!values.invoiceId || isNaN(amount) || amount <= 0) {
+      alert("Please select an invoice and enter a valid amount.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const selectedInvoice = invoices.find(i => i.id === values.invoiceId);
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+      
+      const response = await fetch(`${apiUrl}/api/create-checkout-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: amount,
+          currency: "usd",
+          description: `Invoice #${selectedInvoice?.invoiceNumber}`,
+          metadata: {
+            type: "invoice",
+            id: values.invoiceId,
+            clientName: selectedInvoice?.clientName,
+          },
+          successUrl: `${window.location.origin}/#/dashboard/payments?success=true`,
+          cancelUrl: window.location.href,
+        }),
+      });
+
+      const session = await response.json();
+      if (session.url) {
+        window.location.href = session.url;
+      } else {
+        throw new Error(session.error || "Failed to create checkout session");
+      }
+    } catch (error: any) {
+      console.error("Stripe error:", error);
+      alert(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Form {...form}>
@@ -246,13 +285,39 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
           />
         </div>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? (initialData?.id ? "Updating..." : "Processing...") : (initialData?.id ? "Update Payment" : "Record Payment")}
-          </Button>
+        <div className="flex flex-col gap-3 pt-4">
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Processing...") : (initialData?.id ? "Update Payment" : "Record Manually")}
+            </Button>
+          </div>
+          
+          {!initialData?.id && (
+            <>
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-black px-2 text-muted-foreground">Or process online</span>
+                </div>
+              </div>
+              
+              <Button 
+                type="button"
+                variant="outline"
+                className="w-full border-white/10 hover:bg-white/5 gap-2 h-12 font-bold"
+                onClick={handleStripePayment}
+                disabled={isSubmitting}
+              >
+                <StripeIcon className="h-4 w-4" />
+                Process with Stripe
+              </Button>
+            </>
+          )}
         </div>
       </form>
     </Form>
