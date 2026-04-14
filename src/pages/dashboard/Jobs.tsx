@@ -26,6 +26,8 @@ import { JobForm } from "../../components/forms/JobForm";
 import { MediaUpload } from "../../components/MediaUpload";
 import { cn } from "@/lib/utils";
 
+import { getApiUrl } from "../../lib/api-utils";
+
 const Jobs = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,7 @@ const Jobs = () => {
       // Send Email with PDF
       if (clientData?.email) {
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+          const apiUrl = getApiUrl();
           
           if (!window.location.hostname.includes("github.io") || import.meta.env.VITE_API_URL) {
             await fetch(`${apiUrl}/api/send-invoice`, {

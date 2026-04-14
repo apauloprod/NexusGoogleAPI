@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
+import { getApiUrl } from "../../lib/api-utils";
+
 const Settings = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
@@ -327,23 +329,66 @@ const Settings = () => {
                 <h2 className="text-2xl font-bold">Developer Tools</h2>
               </div>
               
-              <div className="glass p-8 rounded-3xl border-white/5">
-                <h3 className="text-lg font-bold mb-2">Seed Sample Data</h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Populate your database with sample clients, requests, quotes, and jobs to test the dashboard functionality.
-                </p>
-                <Button 
-                  onClick={seedData} 
-                  disabled={isSeeding}
-                  className={`rounded-xl px-8 h-12 font-bold gap-2 transition-all ${
-                    isSeeding 
-                      ? "bg-white/10 text-muted-foreground" 
-                      : "bg-emerald-500 text-white hover:bg-emerald-600"
-                  }`}
-                >
-                  <Database className="h-4 w-4" />
-                  {isSeeding ? "Seeding Database..." : "Seed Sample Data"}
-                </Button>
+              <div className="glass p-8 rounded-3xl border-white/5 space-y-8">
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-white">Email Service (Resend)</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Test if your backend API and Resend integration are working correctly.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="rounded-xl border-white/10 hover:bg-white/5"
+                      onClick={async () => {
+                        try {
+                          const apiUrl = getApiUrl();
+                          const res = await fetch(`${apiUrl}/api/health`);
+                          const data = await res.json();
+                          alert(`API Status: ${data.status}\nEnvironment: ${data.env}`);
+                        } catch (err) {
+                          alert("Failed to connect to API. Check your VITE_API_URL or server status.");
+                        }
+                      }}
+                    >
+                      Test API Health
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="rounded-xl border-white/10 hover:bg-white/5"
+                      onClick={async () => {
+                        try {
+                          const apiUrl = getApiUrl();
+                          const res = await fetch(`${apiUrl}/api/send-quote`);
+                          const data = await res.json();
+                          alert(`API Route Check: ${data.message}`);
+                        } catch (err) {
+                          alert("API Route /api/send-quote not found (404).");
+                        }
+                      }}
+                    >
+                      Test Quote Route
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/5">
+                  <h3 className="text-lg font-bold mb-2 text-white">Seed Sample Data</h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Populate your database with sample clients, requests, quotes, and jobs to test the dashboard functionality.
+                  </p>
+                  <Button 
+                    onClick={seedData} 
+                    disabled={isSeeding}
+                    className={`rounded-xl px-8 h-12 font-bold gap-2 transition-all ${
+                      isSeeding 
+                        ? "bg-white/10 text-muted-foreground" 
+                        : "bg-emerald-500 text-white hover:bg-emerald-600"
+                    }`}
+                  >
+                    <Database className="h-4 w-4" />
+                    {isSeeding ? "Seeding Database..." : "Seed Sample Data"}
+                  </Button>
+                </div>
               </div>
             </section>
           )}

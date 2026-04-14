@@ -49,6 +49,8 @@ interface QuoteFormProps {
 
 import { SchedulePicker } from "../SchedulePicker";
 
+import { getApiUrl } from "../../lib/api-utils";
+
 export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,7 +133,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       const clientData = clientDoc.exists() ? clientDoc.data() : null;
       if (clientData?.email) {
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+          const apiUrl = getApiUrl();
           
           if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
             const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";

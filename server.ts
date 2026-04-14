@@ -49,7 +49,12 @@ async function startServer() {
   // API Route to send quote email
   app.get("/api/send-quote", (req, res) => {
     console.log("GET /api/send-quote hit");
-    res.send("API is alive. Use POST to send quotes.");
+    res.json({ status: "alive", method: "GET", path: "/api/send-quote", message: "Use POST to send quotes." });
+  });
+
+  app.get("/api/send-invoice", (req, res) => {
+    console.log("GET /api/send-invoice hit");
+    res.json({ status: "alive", method: "GET", path: "/api/send-invoice", message: "Use POST to send invoices." });
   });
 
   app.post("/api/send-quote", async (req, res) => {
