@@ -104,23 +104,32 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
     setEmailError(null);
     try {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
-      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
       const clientData = clientDoc.exists() ? clientDoc.data() : null;
+      const clientName = clientData?.name || "Unknown Client";
 
       let invoiceId = initialData?.id;
-      const invoiceData = {
+      
+      // Data for Firestore (with Timestamps)
+      const firestoreData = {
         ...values,
         clientName,
         dueDate: new Date(values.dueDate),
         updatedAt: serverTimestamp(),
       };
 
+      // Data for API (clean JSON)
+      const apiData = {
+        ...values,
+        clientName,
+        dueDate: values.dueDate, // Keep as string for API
+      };
+
       if (invoiceId) {
         const invoiceRef = doc(db, "invoices", invoiceId);
-        await updateDoc(invoiceRef, invoiceData);
+        await updateDoc(invoiceRef, firestoreData);
       } else {
         const docRef = await addDoc(collection(db, "invoices"), {
-          ...invoiceData,
+          ...firestoreData,
           status: "sent",
           paidAmount: 0,
           createdAt: serverTimestamp(),
@@ -132,10 +141,8 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
           try {
             const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
             
-            // Check if we are on a known static host
             if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
               const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
-              console.error(msg);
               setEmailError(msg);
               setIsSubmitting(false);
               return;
@@ -145,7 +152,7 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                invoice: { id: invoiceId, ...invoiceData },
+                invoice: { id: invoiceId, ...apiData },
                 clientEmail: clientData.email,
                 appUrl: window.location.origin,
               }),
@@ -155,15 +162,18 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
               const errorData = await response.json().catch(() => ({}));
               console.error("Invoice Email API error:", response.status, errorData);
               setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
-            } else {
-              console.log("Invoice email sent successfully");
+              setIsSubmitting(false);
+              return; // Stop here if email fails so user can see error
             }
           } catch (emailErr) {
             console.error("Failed to send invoice email:", emailErr);
             setEmailError("Network error. Make sure the backend server is running.");
+            setIsSubmitting(false);
+            return;
           }
         }
       }
+      
       form.reset();
       onSuccess?.();
     } catch (error) {

@@ -133,15 +133,17 @@ async function startServer() {
   });
 
   app.post("/api/send-invoice", async (req, res) => {
-    console.log("Received request to send invoice email:", req.body?.invoice?.invoiceNumber);
     const { invoice, clientEmail, appUrl } = req.body;
-
+    console.log(`[INVOICE API] Request received for Invoice #${invoice?.invoiceNumber} to ${clientEmail}`);
+    
     if (!resend) {
+      console.error("[INVOICE API] Resend not configured");
       return res.status(500).json({ error: "Email service not configured. Please add RESEND_API_KEY to environment variables." });
     }
 
     try {
       // 1. Generate PDF
+      console.log("[INVOICE API] Generating PDF...");
       const doc = new jsPDF();
       
       doc.setFontSize(22);
@@ -150,19 +152,21 @@ async function startServer() {
       doc.setFontSize(12);
       doc.text(`Invoice Number: ${invoice.invoiceNumber}`, 20, 40);
       doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 48);
-      doc.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 20, 56);
+      
+      const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "N/A";
+      doc.text(`Due Date: ${dueDateStr}`, 20, 56);
       doc.text(`Client: ${invoice.clientName}`, 20, 64);
       
-      const tableData = invoice.items.map((item: any) => [
-        item.description,
-        `$${item.price.toLocaleString()}`
+      const tableData = (invoice.items || []).map((item: any) => [
+        item.description || "Service",
+        `$${(Number(item.price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
       ]);
       
       autoTable(doc, {
         startY: 80,
         head: [['Description', 'Price']],
         body: tableData,
-        foot: [['Total', `$${invoice.total.toLocaleString()}`]],
+        foot: [['Total', `$${(Number(invoice.total) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`]],
         theme: 'grid',
         headStyles: { fillColor: [0, 0, 0] },
       });
@@ -175,8 +179,10 @@ async function startServer() {
       }
 
       const pdfBase64 = doc.output("datauristring").split(",")[1];
+      console.log("[INVOICE API] PDF generated successfully");
 
       // 2. Send Email
+      console.log("[INVOICE API] Sending email via Resend...");
       const { data, error } = await resend.emails.send({
         from: "CRM <onboarding@resend.dev>",
         to: [clientEmail],
@@ -187,8 +193,8 @@ async function startServer() {
             <p style="color: #555; line-height: 1.6;">Please find the attached invoice <strong>#${invoice.invoiceNumber}</strong> for services rendered.</p>
             <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 0; font-size: 14px; color: #888; text-transform: uppercase;">Amount Due</p>
-              <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #000;">$${invoice.total.toLocaleString()}</p>
-              <p style="margin: 10px 0 0; font-size: 12px; color: #888;">Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+              <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #000;">$${(Number(invoice.total) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              <p style="margin: 10px 0 0; font-size: 12px; color: #888;">Due Date: ${dueDateStr}</p>
             </div>
             <p style="color: #555; line-height: 1.6;">You can pay this invoice by replying to this email or following our standard payment procedures.</p>
             <p style="color: #888; font-size: 12px; margin-top: 30px;">Thank you for your business!</p>
@@ -203,13 +209,15 @@ async function startServer() {
       });
 
       if (error) {
+        console.error("[INVOICE API] Resend error:", error);
         return res.status(400).json({ error });
       }
 
+      console.log("[INVOICE API] Email sent successfully:", data?.id);
       res.json({ success: true, data });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to generate PDF or send email." });
+      console.error("[INVOICE API] Unexpected error:", err);
+      res.status(500).json({ error: "Failed to generate PDF or send email.", details: err instanceof Error ? err.message : String(err) });
     }
   });
 
