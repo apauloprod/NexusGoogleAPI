@@ -23,12 +23,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { JobForm } from "../../components/forms/JobForm";
+import { MediaUpload } from "../../components/MediaUpload";
+import { cn } from "@/lib/utils";
 
 const Jobs = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
+  const [viewingMediaJob, setViewingMediaJob] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
@@ -173,6 +176,22 @@ const Jobs = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!viewingMediaJob} onOpenChange={(open) => !open && setViewingMediaJob(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Job Media</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {viewingMediaJob && (
+              <MediaUpload 
+                jobId={viewingMediaJob.id} 
+                onClose={() => setViewingMediaJob(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading jobs...</div>
@@ -218,6 +237,14 @@ const Jobs = () => {
                       Invoice
                     </Button>
                   )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => setViewingMediaJob(job)}
+                  >
+                    <ImageIcon className="h-5 w-5" />
+                  </Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 

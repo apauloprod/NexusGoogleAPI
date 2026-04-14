@@ -1,5 +1,5 @@
 {
-  "name": "Nexus Analytics - Data-Driven AI Agency",
-  "description": "A professional, modern agency website for data-driven strategies, advanced analytics, and proven AI systems.",
-  "requestFramePermissions": []
+  "name": "Nexus Field Service",
+  "description": "A comprehensive field service management platform with AI-powered marketing, scheduling, and invoicing.",
+  "requestFramePermissions": ["camera"]
 }

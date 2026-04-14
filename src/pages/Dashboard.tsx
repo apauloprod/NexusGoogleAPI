@@ -20,7 +20,8 @@ import {
   User as UserIcon,
   Mail,
   MapPin,
-  LogIn
+  LogIn,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,7 @@ import Clients from "./dashboard/Clients";
 import Messages from "./dashboard/Messages";
 import SettingsPage from "./dashboard/Settings";
 import Timesheets from "./dashboard/Timesheets";
+import Marketing from "./dashboard/Marketing";
 
 interface SidebarItemProps {
   icon: any;
@@ -130,6 +132,7 @@ export default function Dashboard() {
     { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" },
     { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
     { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
+    { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
   ];
 
   const Sidebar = () => (
@@ -435,6 +438,7 @@ export default function Dashboard() {
             <Route path="/messages" element={<Messages />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/timesheets" element={<Timesheets />} />
+            <Route path="/marketing" element={<Marketing />} />
           </Routes>
         </main>
       </div>
