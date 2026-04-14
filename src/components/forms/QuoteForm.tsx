@@ -74,11 +74,13 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     name: "items",
   });
 
+  const watchItems = form.watch("items");
+  const total = watchItems?.reduce((sum, item) => sum + (Number(item.price) || 0), 0) || 0;
+
   async function onSubmit(values: QuoteFormValues) {
     setIsSubmitting(true);
     try {
       const selectedClient = clients.find(c => c.id === values.clientId);
-      const total = values.items.reduce((sum, item) => sum + item.price, 0);
       
       if (initialData?.id) {
         const quoteRef = doc(db, "quotes", initialData.id);
@@ -207,6 +209,13 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-white/5">
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Total Amount</p>
+              <p className="text-xl font-bold text-white">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            </div>
           </div>
         </div>
 

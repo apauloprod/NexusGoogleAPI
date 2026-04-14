@@ -131,9 +131,14 @@ const Invoices = () => {
                   <p className="text-lg font-bold text-white">
                     ${inv.total?.toLocaleString() || "0.00"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 text-emerald-500">
-                    {inv.status === 'paid' ? 'Fully Paid' : `$${(inv.total - (inv.paidAmount || 0)).toLocaleString()} balance`}
-                  </p>
+                  <div className="flex flex-col items-end gap-0.5 mt-1">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                      {inv.items?.length || 0} items
+                    </p>
+                    <p className="text-xs text-muted-foreground text-emerald-500">
+                      {inv.status === 'paid' ? 'Fully Paid' : `$${(inv.total - (inv.paidAmount || 0)).toLocaleString()} balance`}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button 

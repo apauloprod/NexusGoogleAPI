@@ -1,4 +1,4 @@
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
@@ -27,6 +28,10 @@ const invoiceSchema = z.object({
   clientId: z.string().min(1, "Please select a client"),
   invoiceNumber: z.string().min(1, "Invoice number is required"),
   total: z.coerce.number().min(0, "Total must be positive"),
+  items: z.array(z.object({
+    description: z.string().min(1, "Description is required"),
+    price: z.coerce.number().min(0, "Price must be positive"),
+  })),
   dueDate: z.string().min(1, "Due date is required"),
   notes: z.string().optional(),
 });
@@ -34,7 +39,7 @@ const invoiceSchema = z.object({
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
 interface InvoiceFormProps {
-  initialData?: InvoiceFormValues & { id: string };
+  initialData?: any;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -62,10 +67,23 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
       clientId: "",
       invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
       total: 0,
+      items: [{ description: "", price: 0 }],
       dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       notes: "",
     },
   });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
+  });
+
+  // Automatically update total when items change
+  const watchItems = form.watch("items");
+  useEffect(() => {
+    const total = watchItems?.reduce((sum, item) => sum + (Number(item.price) || 0), 0) || 0;
+    form.setValue("total", total);
+  }, [watchItems, form]);
 
   async function onSubmit(values: InvoiceFormValues) {
     setIsSubmitting(true);
@@ -141,20 +159,75 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
           />
         </div>
 
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <FormLabel>Services / Items</FormLabel>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              className="h-8 border-white/10 hover:bg-white/5"
+              onClick={() => append({ description: "", price: 0 })}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Add Service
+            </Button>
+          </div>
+          
+          <div className="space-y-2">
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="Service description" {...field} className="bg-white/5 border-white/10" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="w-32">
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.price`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input type="number" placeholder="Price" {...field} className="bg-white/5 border-white/10" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                {fields.length > 1 && (
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+          <div className="flex justify-end pt-2 border-t border-white/5">
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Total Amount</p>
+              <p className="text-xl font-bold text-white">${watchItems?.reduce((sum, item) => sum + (Number(item.price) || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="total"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Total Amount ($)</FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.01" {...field} className="bg-white/5 border-white/10" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
           <FormField
             control={form.control}
             name="dueDate"

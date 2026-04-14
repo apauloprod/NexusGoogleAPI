@@ -49,6 +49,7 @@ const Jobs = () => {
         clientId: job.clientId,
         clientName: job.clientName,
         total: job.total || 0,
+        items: job.items || [],
         status: "sent",
         paidAmount: 0,
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
@@ -151,15 +152,13 @@ const Jobs = () => {
                 </div>
               </div>
               <div className="flex items-center gap-6">
-                <div className="flex items-center gap-4 text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <MessageSquare className="h-4 w-4" />
-                    <span className="text-xs">{job.notesCount || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <ImageIcon className="h-4 w-4" />
-                    <span className="text-xs">{job.photosCount || 0}</span>
-                  </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-white">
+                    ${job.total?.toLocaleString() || "0.00"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {job.items?.length || 0} items
+                  </p>
                 </div>
                 <div className="h-8 w-px bg-white/5 mx-2" />
                 <div className="flex items-center gap-2">
