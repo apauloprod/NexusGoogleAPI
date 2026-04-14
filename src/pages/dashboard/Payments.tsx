@@ -14,9 +14,19 @@ import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { PaymentForm } from "../../components/forms/PaymentForm";
+
 const Payments = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "payments"), orderBy("createdAt", "desc"));
@@ -45,10 +55,25 @@ const Payments = () => {
               <p className="text-lg font-bold">$42,850.00</p>
             </div>
           </div>
-          <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-            <Plus className="h-4 w-4" />
-            Record Payment
-          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                <Plus className="h-4 w-4" />
+                Record Payment
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold tracking-tighter">Record Payment</DialogTitle>
+              </DialogHeader>
+              <div className="pt-4">
+                <PaymentForm 
+                  onSuccess={() => setIsAddDialogOpen(false)} 
+                  onCancel={() => setIsAddDialogOpen(false)} 
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

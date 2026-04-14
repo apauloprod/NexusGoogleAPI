@@ -43,6 +43,10 @@ import {
 import { ClientForm } from "../components/forms/ClientForm";
 import { VisitForm } from "../components/forms/VisitForm";
 import { RequestFormInternal } from "../components/forms/RequestFormInternal";
+import { QuoteForm } from "../components/forms/QuoteForm";
+import { JobForm } from "../components/forms/JobForm";
+import { InvoiceForm } from "../components/forms/InvoiceForm";
+import { PaymentForm } from "../components/forms/PaymentForm";
 
 // Import Dashboard Components
 import Requests from "./dashboard/Requests";
@@ -84,7 +88,7 @@ export default function Dashboard() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [activeForm, setActiveForm] = useState<"client" | "visit" | "request" | null>(null);
+  const [activeForm, setActiveForm] = useState<"client" | "visit" | "request" | "quote" | "job" | "invoice" | "payment" | null>(null);
 
   if (loading) {
     return (
@@ -151,35 +155,71 @@ export default function Dashboard() {
                 {activeForm === "client" ? "Add New Client" : 
                  activeForm === "visit" ? "Schedule New Visit" : 
                  activeForm === "request" ? "Create New Request" : 
+                 activeForm === "quote" ? "Create New Quote" :
+                 activeForm === "job" ? "Create New Job" :
+                 activeForm === "invoice" ? "Create New Invoice" :
+                 activeForm === "payment" ? "Record Payment" :
                  "What would you like to create?"}
               </DialogTitle>
             </DialogHeader>
             
             {!activeForm ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
                 <Button 
                   variant="outline" 
-                  className="flex flex-col h-32 gap-3 border-white/10 hover:bg-white/5 rounded-2xl"
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
                   onClick={() => setActiveForm("client")}
                 >
-                  <Users className="h-8 w-8" />
-                  <span>Client</span>
+                  <Users className="h-6 w-6" />
+                  <span className="text-xs">Client</span>
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="flex flex-col h-32 gap-3 border-white/10 hover:bg-white/5 rounded-2xl"
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
                   onClick={() => setActiveForm("visit")}
                 >
-                  <Calendar className="h-8 w-8" />
-                  <span>Visit</span>
+                  <Calendar className="h-6 w-6" />
+                  <span className="text-xs">Visit</span>
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="flex flex-col h-32 gap-3 border-white/10 hover:bg-white/5 rounded-2xl"
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
                   onClick={() => setActiveForm("request")}
                 >
-                  <FileText className="h-8 w-8" />
-                  <span>Request</span>
+                  <FileText className="h-6 w-6" />
+                  <span className="text-xs">Request</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("quote")}
+                >
+                  <FileText className="h-6 w-6 text-blue-400" />
+                  <span className="text-xs">Quote</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("job")}
+                >
+                  <CheckSquare className="h-6 w-6 text-emerald-400" />
+                  <span className="text-xs">Job</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("invoice")}
+                >
+                  <FileText className="h-6 w-6 text-amber-400" />
+                  <span className="text-xs">Invoice</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("payment")}
+                >
+                  <CreditCard className="h-6 w-6 text-purple-400" />
+                  <span className="text-xs">Payment</span>
                 </Button>
               </div>
             ) : (
@@ -204,6 +244,42 @@ export default function Dashboard() {
                 )}
                 {activeForm === "request" && (
                   <RequestFormInternal 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "quote" && (
+                  <QuoteForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "job" && (
+                  <JobForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "invoice" && (
+                  <InvoiceForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "payment" && (
+                  <PaymentForm 
                     onSuccess={() => {
                       setCreateDialogOpen(false);
                       setActiveForm(null);

@@ -14,9 +14,19 @@ import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { QuoteForm } from "../../components/forms/QuoteForm";
+
 const Quotes = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
@@ -50,10 +60,25 @@ const Quotes = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Quotes</h1>
           <p className="text-muted-foreground">Create and manage professional quotes for your clients.</p>
         </div>
-        <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-          <Plus className="h-4 w-4" />
-          New Quote
-        </Button>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+              <Plus className="h-4 w-4" />
+              New Quote
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Quote</DialogTitle>
+            </DialogHeader>
+            <div className="pt-4">
+              <QuoteForm 
+                onSuccess={() => setIsAddDialogOpen(false)} 
+                onCancel={() => setIsAddDialogOpen(false)} 
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-4">
