@@ -128,7 +128,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         const clientData = clientDoc.exists() ? clientDoc.data() : null;
         if (clientData?.email) {
           try {
-            await fetch("/api/send-quote", {
+            const response = await fetch(`${window.location.origin}/api/send-quote`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -137,6 +137,13 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
                 appUrl: window.location.origin,
               }),
             });
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              console.error("Email API error:", response.status, errorData);
+            } else {
+              console.log("Quote email sent successfully");
+            }
           } catch (emailErr) {
             console.error("Failed to send quote email:", emailErr);
           }

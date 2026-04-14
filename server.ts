@@ -5,10 +5,12 @@ import { createServer as createViteServer } from "vite";
 import cors from "cors";
 import { Resend } from "resend";
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+console.log("SERVER SCRIPT LOADED");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,13 +19,38 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
   
-  app.use(cors());
+  app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  }));
   app.use(express.json());
+
+  // Request logging
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    if (req.method === "POST") {
+      console.log("Body keys:", Object.keys(req.body || {}));
+    }
+    next();
+  });
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    console.log("Health check requested");
+    res.json({ status: "ok", env: process.env.NODE_ENV });
+  });
 
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
   // API Route to send quote email
+  app.get("/api/send-quote", (req, res) => {
+    console.log("GET /api/send-quote hit");
+    res.send("API is alive. Use POST to send quotes.");
+  });
+
   app.post("/api/send-quote", async (req, res) => {
+    console.log("Received request to send quote email:", req.body?.quote?.quoteNumber);
     const { quote, clientEmail, appUrl } = req.body;
 
     if (!resend) {
@@ -48,7 +75,7 @@ async function startServer() {
         `$${item.price.toLocaleString()}`
       ]);
       
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 70,
         head: [['Description', 'Price']],
         body: tableData,
@@ -58,7 +85,7 @@ async function startServer() {
       });
       
       if (quote.notes) {
-        const finalY = (doc as any).lastAutoTable.finalY || 70;
+        const finalY = (doc as any).lastAutoTable?.finalY || 70;
         doc.text("Notes:", 20, finalY + 20);
         doc.setFontSize(10);
         doc.text(quote.notes, 20, finalY + 28, { maxWidth: 170 });
