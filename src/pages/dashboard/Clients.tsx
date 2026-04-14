@@ -7,13 +7,14 @@ import {
   Phone,
   MapPin,
   Search,
-  MoreVertical
+  MoreVertical,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -30,6 +31,17 @@ const Clients = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
+  const [clientToDelete, setClientToDelete] = useState<any>(null);
+
+  const handleDelete = async () => {
+    if (!clientToDelete) return;
+    try {
+      await deleteDoc(doc(db, "clients", clientToDelete.id));
+      setClientToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "clients");
+    }
+  };
 
   useEffect(() => {
     const q = query(collection(db, "clients"), orderBy("name", "asc"));
@@ -124,7 +136,7 @@ const Clients = () => {
         ) : (
           filteredClients.map((client) => (
             <div key={client.id} className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -132,6 +144,14 @@ const Clients = () => {
                   onClick={() => setEditingClient(client)}
                 >
                   <MoreVertical className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => setClientToDelete(client)}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               
@@ -176,6 +196,21 @@ const Clients = () => {
           ))
         )}
       </div>
+
+      <Dialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[400px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter text-center">Confirm Deletion</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 text-center text-muted-foreground">
+            Are you sure you want to delete <strong>{clientToDelete?.name}</strong>? This will not delete their associated jobs or invoices.
+          </div>
+          <div className="flex gap-3">
+            <Button variant="ghost" className="flex-1" onClick={() => setClientToDelete(null)}>Cancel</Button>
+            <Button variant="destructive" className="flex-1 rounded-xl font-bold" onClick={handleDelete}>Delete</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

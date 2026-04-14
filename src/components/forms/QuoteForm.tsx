@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, limit } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -56,7 +56,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     resolver: zodResolver(quoteSchema),
     defaultValues: {
       clientId: initialData?.clientId || "",
-      quoteNumber: initialData?.quoteNumber || `Q-${Math.floor(1000 + Math.random() * 9000)}`,
+      quoteNumber: initialData?.quoteNumber || "",
       items: initialData?.items || [{ description: "", price: 0 }],
       notes: initialData?.notes || "",
       scheduledAt: initialData?.scheduledAt 
@@ -65,6 +65,29 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       duration: initialData?.duration || "1h",
     },
   });
+
+  useEffect(() => {
+    if (!initialData?.id && !form.getValues("quoteNumber")) {
+      const fetchLatestQuoteNumber = async () => {
+        try {
+          const q = query(collection(db, "quotes"), orderBy("quoteNumber", "desc"), limit(1));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const latestQuote = snapshot.docs[0].data();
+            const latestNumber = parseInt(latestQuote.quoteNumber) || 0;
+            const nextNumber = (latestNumber + 1).toString().padStart(4, '0');
+            form.setValue("quoteNumber", nextNumber);
+          } else {
+            form.setValue("quoteNumber", "0001");
+          }
+        } catch (error) {
+          console.error("Error fetching latest quote number:", error);
+          form.setValue("quoteNumber", "0001");
+        }
+      };
+      fetchLatestQuoteNumber();
+    }
+  }, [initialData, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,

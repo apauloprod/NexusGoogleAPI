@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, doc, deleteDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -23,6 +23,7 @@ import {
 import { VisitForm } from "../../components/forms/VisitForm";
 import { JobForm } from "../../components/forms/JobForm";
 import { cn } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
 
 const Schedule = () => {
   const [visits, setVisits] = useState<any[]>([]);
@@ -30,6 +31,18 @@ const Schedule = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [itemToDelete, setItemToDelete] = useState<any>(null);
+
+  const handleDelete = async () => {
+    if (!itemToDelete) return;
+    try {
+      const collectionName = itemToDelete.type === 'job' ? 'jobs' : 'visits';
+      await deleteDoc(doc(db, collectionName, itemToDelete.id));
+      setItemToDelete(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, itemToDelete.type === 'job' ? 'jobs' : 'visits');
+    }
+  };
 
   useEffect(() => {
     const visitsQuery = query(collection(db, "visits"), orderBy("scheduledAt", "asc"));
@@ -180,10 +193,36 @@ const Schedule = () => {
                   </div>
                 ))}
               </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setItemToDelete(item);
+                }}
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
             </div>
           ))
         )}
       </div>
+
+      <Dialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[400px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter text-center">Confirm Deletion</DialogTitle>
+          </DialogHeader>
+          <div className="py-6 text-center text-muted-foreground">
+            Are you sure you want to delete this {itemToDelete?.type}? This action cannot be undone.
+          </div>
+          <div className="flex gap-3">
+            <Button variant="ghost" className="flex-1" onClick={() => setItemToDelete(null)}>Cancel</Button>
+            <Button variant="destructive" className="flex-1 rounded-xl font-bold" onClick={handleDelete}>Delete</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
