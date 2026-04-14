@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -44,6 +44,43 @@ const Quotes = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const [isSending, setIsSending] = useState<string | null>(null);
+
+  const sendQuoteEmail = async (quote: any) => {
+    setIsSending(quote.id);
+    try {
+      const clientDoc = await getDoc(doc(db, "clients", quote.clientId));
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
+
+      if (!clientData?.email) {
+        alert("Client has no email address.");
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+      const response = await fetch(`${apiUrl}/api/send-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quote: { id: quote.id, ...quote },
+          clientEmail: clientData.email,
+          appUrl: window.location.origin,
+        }),
+      });
+
+      if (response.ok) {
+        alert("Quote sent successfully!");
+      } else {
+        alert("Failed to send quote.");
+      }
+    } catch (error) {
+      console.error("Error sending quote:", error);
+      alert("Error sending quote.");
+    } finally {
+      setIsSending(null);
+    }
+  };
 
   const downloadQuote = (quote: any) => {
     const doc = new jsPDF();
@@ -230,6 +267,15 @@ const Quotes = () => {
                       Approve & Job
                     </Button>
                   )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => sendQuoteEmail(quote)}
+                    disabled={isSending === quote.id}
+                  >
+                    <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
+                  </Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 

@@ -8,12 +8,13 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
-  Edit2
+  Edit2,
+  Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDoc, doc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -31,6 +32,7 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
+  const [isSending, setIsSending] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
@@ -43,6 +45,44 @@ const Invoices = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const sendInvoiceEmail = async (inv: any) => {
+    setIsSending(inv.id);
+    try {
+      const clientDoc = await getDoc(doc(db, "clients", inv.clientId));
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
+
+      if (!clientData?.email) {
+        alert("Client has no email address.");
+        return;
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+      const response = await fetch(`${apiUrl}/api/send-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoice: { 
+            ...inv, 
+            dueDate: inv.dueDate?.toDate().toISOString() || new Date().toISOString() 
+          },
+          clientEmail: clientData.email,
+          appUrl: window.location.origin,
+        }),
+      });
+
+      if (response.ok) {
+        alert("Invoice sent successfully!");
+      } else {
+        alert("Failed to send invoice.");
+      }
+    } catch (error) {
+      console.error("Error sending invoice:", error);
+      alert("Error sending invoice.");
+    } finally {
+      setIsSending(null);
+    }
+  };
 
   const downloadInvoice = (inv: any) => {
     const doc = new jsPDF();
@@ -179,6 +219,15 @@ const Invoices = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => sendInvoiceEmail(inv)}
+                    disabled={isSending === inv.id}
+                  >
+                    <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
+                  </Button>
                   <Button 
                     variant="ghost" 
                     size="icon" 

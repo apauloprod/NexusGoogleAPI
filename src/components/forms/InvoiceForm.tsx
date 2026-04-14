@@ -135,42 +135,42 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
           createdAt: serverTimestamp(),
         });
         invoiceId = docRef.id;
+      }
 
-        // Send Email with PDF
-        if (clientData?.email) {
-          try {
-            const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-            
-            if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
-              const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
-              setEmailError(msg);
-              setIsSubmitting(false);
-              return;
-            }
-
-            const response = await fetch(`${apiUrl}/api/send-invoice`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                invoice: { id: invoiceId, ...apiData },
-                clientEmail: clientData.email,
-                appUrl: window.location.origin,
-              }),
-            });
-            
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              console.error("Invoice Email API error:", response.status, errorData);
-              setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
-              setIsSubmitting(false);
-              return; // Stop here if email fails so user can see error
-            }
-          } catch (emailErr) {
-            console.error("Failed to send invoice email:", emailErr);
-            setEmailError("Network error. Make sure the backend server is running.");
+      // Send Email with PDF (for both new and updated invoices)
+      if (clientData?.email) {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+          
+          if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
+            const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
+            setEmailError(msg);
             setIsSubmitting(false);
             return;
           }
+
+          const response = await fetch(`${apiUrl}/api/send-invoice`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              invoice: { id: invoiceId, ...apiData },
+              clientEmail: clientData.email,
+              appUrl: window.location.origin,
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error("Invoice Email API error:", response.status, errorData);
+            setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
+            setIsSubmitting(false);
+            return; 
+          }
+        } catch (emailErr) {
+          console.error("Failed to send invoice email:", emailErr);
+          setEmailError("Network error. Make sure the backend server is running.");
+          setIsSubmitting(false);
+          return;
         }
       }
       

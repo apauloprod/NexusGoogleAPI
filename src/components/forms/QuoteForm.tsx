@@ -125,46 +125,46 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           createdAt: serverTimestamp(),
         });
         quoteId = docRef.id;
+      }
 
-        // Send Email with PDF
-        const clientData = clientDoc.exists() ? clientDoc.data() : null;
-        if (clientData?.email) {
-          try {
-            const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-            
-            // Check if we are on a known static host
-            if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
-              const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
-              console.error(msg);
-              setEmailError(msg);
-              setIsSubmitting(false);
-              return;
-            }
-
-            const response = await fetch(`${apiUrl}/api/send-quote`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                quote: { id: quoteId, ...quoteData },
-                clientEmail: clientData.email,
-                appUrl: window.location.origin,
-              }),
-            });
-            
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              console.error("Email API error:", response.status, errorData);
-              setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
-            } else {
-              console.log("Quote email sent successfully");
-              onSuccess();
-            }
-          } catch (emailErr) {
-            console.error("Failed to send quote email:", emailErr);
-            setEmailError("Network error. Make sure the backend server is running.");
+      // Send Email with PDF (for both new and updated quotes)
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
+      if (clientData?.email) {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+          
+          if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
+            const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
+            console.error(msg);
+            setEmailError(msg);
+            setIsSubmitting(false);
+            return;
           }
-        } else {
-          onSuccess();
+
+          const response = await fetch(`${apiUrl}/api/send-quote`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              quote: { id: quoteId, ...quoteData },
+              clientEmail: clientData.email,
+              appUrl: window.location.origin,
+            }),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error("Email API error:", response.status, errorData);
+            setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
+            setIsSubmitting(false);
+            return;
+          } else {
+            console.log("Quote email sent successfully");
+          }
+        } catch (emailErr) {
+          console.error("Failed to send quote email:", emailErr);
+          setEmailError("Network error. Make sure the backend server is running.");
+          setIsSubmitting(false);
+          return;
         }
       }
 

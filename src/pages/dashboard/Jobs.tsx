@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -53,7 +53,10 @@ const Jobs = () => {
         }
       }
 
-      await addDoc(collection(db, "invoices"), {
+      const clientDoc = await getDoc(doc(db, "clients", job.clientId));
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
+
+      const invoiceData = {
         invoiceNumber: invoiceNumber,
         clientId: job.clientId,
         clientName: job.clientName,
@@ -67,8 +70,33 @@ const Jobs = () => {
         notes: job.notes || "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      const docRef = await addDoc(collection(db, "invoices"), invoiceData);
+      const invoiceId = docRef.id;
       
+      // Send Email with PDF
+      if (clientData?.email) {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+          
+          if (!window.location.hostname.includes("github.io") || import.meta.env.VITE_API_URL) {
+            await fetch(`${apiUrl}/api/send-invoice`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                invoice: { id: invoiceId, ...invoiceData, dueDate: invoiceData.dueDate.toISOString() },
+                clientEmail: clientData.email,
+                appUrl: window.location.origin,
+              }),
+            });
+            console.log("Invoice email sent successfully");
+          }
+        } catch (emailErr) {
+          console.error("Failed to send invoice email:", emailErr);
+        }
+      }
+
       // Update job status
       const jobRef = doc(db, "jobs", job.id);
       await updateDoc(jobRef, {
