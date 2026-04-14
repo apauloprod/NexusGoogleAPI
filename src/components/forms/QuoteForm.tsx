@@ -32,12 +32,16 @@ const quoteSchema = z.object({
     price: z.coerce.number().min(0, "Price must be positive"),
   })).min(1, "At least one item is required"),
   notes: z.string().optional(),
+  // Scheduling fields
+  scheduledDate: z.string().optional(),
+  scheduledTime: z.string().optional(),
+  duration: z.string().optional(),
 });
 
 type QuoteFormValues = z.infer<typeof quoteSchema>;
 
 interface QuoteFormProps {
-  initialData?: QuoteFormValues & { id: string };
+  initialData?: any;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -61,11 +65,14 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
 
   const form = useForm({
     resolver: zodResolver(quoteSchema),
-    defaultValues: initialData || {
-      clientId: "",
-      quoteNumber: `Q-${Math.floor(1000 + Math.random() * 9000)}`,
-      items: [{ description: "", price: 0 }],
-      notes: "",
+    defaultValues: {
+      clientId: initialData?.clientId || "",
+      quoteNumber: initialData?.quoteNumber || `Q-${Math.floor(1000 + Math.random() * 9000)}`,
+      items: initialData?.items || [{ description: "", price: 0 }],
+      notes: initialData?.notes || "",
+      scheduledDate: initialData?.scheduledDate || "",
+      scheduledTime: initialData?.scheduledTime || "09:00",
+      duration: initialData?.duration || "1h",
     },
   });
 
@@ -81,24 +88,45 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     setIsSubmitting(true);
     try {
       const selectedClient = clients.find(c => c.id === values.clientId);
+      let quoteId = initialData?.id;
       
-      if (initialData?.id) {
-        const quoteRef = doc(db, "quotes", initialData.id);
-        await updateDoc(quoteRef, {
-          ...values,
-          clientName: selectedClient?.name || "Unknown Client",
-          total,
-          updatedAt: serverTimestamp(),
-        });
+      const quoteData = {
+        ...values,
+        clientName: selectedClient?.name || "Unknown Client",
+        total,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (quoteId) {
+        const quoteRef = doc(db, "quotes", quoteId);
+        await updateDoc(quoteRef, quoteData);
       } else {
-        await addDoc(collection(db, "quotes"), {
-          ...values,
-          clientName: selectedClient?.name || "Unknown Client",
-          total,
+        const docRef = await addDoc(collection(db, "quotes"), {
+          ...quoteData,
           status: "sent",
           createdAt: serverTimestamp(),
         });
+        quoteId = docRef.id;
       }
+
+      // Handle scheduling
+      if (values.scheduledDate && values.scheduledTime) {
+        // Create or update associated visit
+        // For simplicity, we create a new visit if it's a new quote or if we want to track it
+        // In a real app, we might check if a visit already exists for this quote
+        await addDoc(collection(db, "visits"), {
+          clientId: values.clientId,
+          clientName: selectedClient?.name || "Unknown Client",
+          title: `Quote ${values.quoteNumber} Visit`,
+          date: values.scheduledDate,
+          time: values.scheduledTime,
+          duration: values.duration || "1h",
+          status: "pending", // Always pending when created from quote
+          quoteId: quoteId,
+          createdAt: serverTimestamp(),
+        });
+      }
+
       form.reset();
       onSuccess?.();
     } catch (error) {
@@ -236,6 +264,62 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
             </FormItem>
           )}
         />
+
+        <div className="space-y-3 pt-2 border-t border-white/5">
+          <FormLabel className="text-white/50 text-xs uppercase font-bold tracking-wider">Scheduling (Optional)</FormLabel>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="scheduledDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} className="bg-white/5 border-white/10" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="scheduledTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Time</FormLabel>
+                  <FormControl>
+                    <Input type="time" {...field} className="bg-white/5 border-white/10" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="duration"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duration</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue placeholder="Select duration" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="bg-black border-white/10">
+                      <SelectItem value="30m">30 mins</SelectItem>
+                      <SelectItem value="1h">1 hour</SelectItem>
+                      <SelectItem value="2h">2 hours</SelectItem>
+                      <SelectItem value="4h">4 hours</SelectItem>
+                      <SelectItem value="8h">Full day</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>

@@ -19,12 +19,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { RequestFormInternal } from "../../components/forms/RequestFormInternal";
+import { QuoteForm } from "../../components/forms/QuoteForm";
+import { updateDoc, doc, getDocs, where, query as firestoreQuery, addDoc, serverTimestamp } from "firebase/firestore";
 
 const Requests = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<any>(null);
+  const [convertingRequest, setConvertingRequest] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
@@ -37,6 +40,46 @@ const Requests = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const handleConvertToQuote = async (request: any) => {
+    // 1. Try to find existing client by email
+    const clientsRef = collection(db, "clients");
+    const q = firestoreQuery(clientsRef, where("email", "==", request.email));
+    const snapshot = await getDocs(q);
+    
+    let clientId = "";
+    if (!snapshot.empty) {
+      clientId = snapshot.docs[0].id;
+    } else {
+      // 2. Create new client if not found
+      const newClientRef = await addDoc(collection(db, "clients"), {
+        name: request.name,
+        email: request.email,
+        phone: request.phone,
+        address: request.address,
+        createdAt: serverTimestamp(),
+      });
+      clientId = newClientRef.id;
+    }
+
+    // 3. Prepare quote data
+    const quoteData = {
+      clientId,
+      items: (request.services || []).map((s: string) => ({ description: s, price: 0 })),
+      notes: request.notes || "",
+      requestId: request.id,
+    };
+
+    setConvertingRequest(quoteData);
+  };
+
+  const onQuoteCreated = async () => {
+    if (convertingRequest?.requestId) {
+      const requestRef = doc(db, "requests", convertingRequest.requestId);
+      await updateDoc(requestRef, { status: "quoted" });
+    }
+    setConvertingRequest(null);
+  };
 
   return (
     <div className="p-8">
@@ -83,6 +126,23 @@ const Requests = () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!convertingRequest} onOpenChange={(open) => !open && setConvertingRequest(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Convert Request to Quote</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {convertingRequest && (
+              <QuoteForm 
+                initialData={convertingRequest}
+                onSuccess={onQuoteCreated} 
+                onCancel={() => setConvertingRequest(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading requests...</div>
@@ -90,8 +150,8 @@ const Requests = () => {
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No requests found.</div>
         ) : (
           requests.map((req) => (
-            <div key={req.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingRequest(req)}>
-              <div className="flex items-center gap-6">
+            <div key={req.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+              <div className="flex items-center gap-6 cursor-pointer" onClick={() => setEditingRequest(req)}>
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                   <UserIcon className="h-6 w-6 text-muted-foreground" />
                 </div>
@@ -117,9 +177,21 @@ const Requests = () => {
                     {req.createdAt?.toDate().toLocaleDateString()}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <ArrowUpRight className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {req.status === 'pending' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-white/10 hover:bg-white/5 text-xs h-8"
+                      onClick={() => handleConvertToQuote(req)}
+                    >
+                      Convert to Quote
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" onClick={() => setEditingRequest(req)}>
+                    <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))

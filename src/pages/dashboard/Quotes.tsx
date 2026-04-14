@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -63,6 +63,20 @@ const Quotes = () => {
         status: "approved",
         updatedAt: serverTimestamp(),
       });
+
+      // Confirm associated visits
+      const visitsRef = collection(db, "visits");
+      const q = query(visitsRef, where("quoteId", "==", quote.id));
+      const snapshot = await getDocs(q);
+      
+      const updatePromises = snapshot.docs.map(visitDoc => 
+        updateDoc(doc(db, "visits", visitDoc.id), {
+          status: "confirmed",
+          updatedAt: serverTimestamp()
+        })
+      );
+      await Promise.all(updatePromises);
+
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "jobs");
     }
