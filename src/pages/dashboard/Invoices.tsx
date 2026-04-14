@@ -23,6 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { InvoiceForm } from "../../components/forms/InvoiceForm";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -41,6 +43,42 @@ const Invoices = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const downloadInvoice = (inv: any) => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(22);
+    doc.text("INVOICE", 105, 20, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.text(`Invoice Number: ${inv.invoiceNumber}`, 20, 40);
+    doc.text(`Date: ${inv.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 20, 48);
+    doc.text(`Due Date: ${inv.dueDate?.toDate().toLocaleDateString() || "N/A"}`, 20, 56);
+    doc.text(`Client: ${inv.clientName}`, 20, 64);
+    
+    const tableData = inv.items.map((item: any) => [
+      item.description,
+      `$${item.price.toLocaleString()}`
+    ]);
+    
+    autoTable(doc, {
+      startY: 80,
+      head: [['Description', 'Price']],
+      body: tableData,
+      foot: [['Total', `$${inv.total.toLocaleString()}`]],
+      theme: 'grid',
+      headStyles: { fillColor: [0, 0, 0] },
+    });
+    
+    if (inv.notes) {
+      const finalY = (doc as any).lastAutoTable?.finalY || 80;
+      doc.text("Notes:", 20, finalY + 20);
+      doc.setFontSize(10);
+      doc.text(inv.notes, 20, finalY + 28, { maxWidth: 170 });
+    }
+
+    doc.save(`Invoice_${inv.invoiceNumber}.pdf`);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -149,7 +187,12 @@ const Invoices = () => {
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => downloadInvoice(inv)}
+                  >
                     <Download className="h-5 w-5" />
                   </Button>
                 </div>

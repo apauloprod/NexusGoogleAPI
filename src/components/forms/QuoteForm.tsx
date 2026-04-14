@@ -91,6 +91,8 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     }
   }, [initialData, form]);
 
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
@@ -132,7 +134,10 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
             
             // Check if we are on a known static host
             if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
-              console.error("Email feature requires a backend. GitHub Pages is static-only. Please set VITE_API_URL to your backend URL.");
+              const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
+              console.error(msg);
+              setEmailError(msg);
+              setIsSubmitting(false);
               return;
             }
 
@@ -149,12 +154,17 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({}));
               console.error("Email API error:", response.status, errorData);
+              setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
             } else {
               console.log("Quote email sent successfully");
+              onSuccess();
             }
           } catch (emailErr) {
             console.error("Failed to send quote email:", emailErr);
+            setEmailError("Network error. Make sure the backend server is running.");
           }
+        } else {
+          onSuccess();
         }
       }
 
@@ -352,13 +362,20 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Quote" : "Create Quote")}
-          </Button>
+        <div className="flex flex-col gap-3 pt-4">
+          {emailError && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium text-center">
+              {emailError}
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Quote" : "Create Quote")}
+            </Button>
+          </div>
         </div>
       </form>
     </Form>

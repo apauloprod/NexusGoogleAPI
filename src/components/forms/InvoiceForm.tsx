@@ -48,6 +48,7 @@ interface InvoiceFormProps {
 
 export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const form = useForm({
     resolver: zodResolver(invoiceSchema),
@@ -100,27 +101,68 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
 
   async function onSubmit(values: InvoiceFormValues) {
     setIsSubmitting(true);
+    setEmailError(null);
     try {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
       const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
 
-      if (initialData?.id) {
-        const invoiceRef = doc(db, "invoices", initialData.id);
-        await updateDoc(invoiceRef, {
-          ...values,
-          clientName,
-          dueDate: new Date(values.dueDate),
-          updatedAt: serverTimestamp(),
-        });
+      let invoiceId = initialData?.id;
+      const invoiceData = {
+        ...values,
+        clientName,
+        dueDate: new Date(values.dueDate),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (invoiceId) {
+        const invoiceRef = doc(db, "invoices", invoiceId);
+        await updateDoc(invoiceRef, invoiceData);
       } else {
-        await addDoc(collection(db, "invoices"), {
-          ...values,
-          clientName,
+        const docRef = await addDoc(collection(db, "invoices"), {
+          ...invoiceData,
           status: "sent",
           paidAmount: 0,
-          dueDate: new Date(values.dueDate),
           createdAt: serverTimestamp(),
         });
+        invoiceId = docRef.id;
+
+        // Send Email with PDF
+        if (clientData?.email) {
+          try {
+            const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+            
+            // Check if we are on a known static host
+            if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
+              const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
+              console.error(msg);
+              setEmailError(msg);
+              setIsSubmitting(false);
+              return;
+            }
+
+            const response = await fetch(`${apiUrl}/api/send-invoice`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                invoice: { id: invoiceId, ...invoiceData },
+                clientEmail: clientData.email,
+                appUrl: window.location.origin,
+              }),
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({}));
+              console.error("Invoice Email API error:", response.status, errorData);
+              setEmailError(`Failed to send email (Status ${response.status}). Check your RESEND_API_KEY.`);
+            } else {
+              console.log("Invoice email sent successfully");
+            }
+          } catch (emailErr) {
+            console.error("Failed to send invoice email:", emailErr);
+            setEmailError("Network error. Make sure the backend server is running.");
+          }
+        }
       }
       form.reset();
       onSuccess?.();
@@ -269,13 +311,20 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
           )}
         />
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Invoice" : "Create Invoice")}
-          </Button>
+        <div className="flex flex-col gap-3 pt-4">
+          {emailError && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium text-center">
+              {emailError}
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Invoice" : "Create Invoice")}
+            </Button>
+          </div>
         </div>
       </form>
     </Form>

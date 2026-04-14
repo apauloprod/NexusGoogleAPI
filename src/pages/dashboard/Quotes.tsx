@@ -23,6 +23,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { QuoteForm } from "../../components/forms/QuoteForm";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Download, Edit2 } from "lucide-react";
 
 const Quotes = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
@@ -41,6 +44,41 @@ const Quotes = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const downloadQuote = (quote: any) => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(22);
+    doc.text("SERVICE QUOTE", 105, 20, { align: "center" });
+    
+    doc.setFontSize(12);
+    doc.text(`Quote Number: ${quote.quoteNumber}`, 20, 40);
+    doc.text(`Date: ${quote.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 20, 48);
+    doc.text(`Client: ${quote.clientName}`, 20, 56);
+    
+    const tableData = quote.items.map((item: any) => [
+      item.description,
+      `$${item.price.toLocaleString()}`
+    ]);
+    
+    autoTable(doc, {
+      startY: 70,
+      head: [['Description', 'Price']],
+      body: tableData,
+      foot: [['Total', `$${quote.total.toLocaleString()}`]],
+      theme: 'grid',
+      headStyles: { fillColor: [0, 0, 0] },
+    });
+    
+    if (quote.notes) {
+      const finalY = (doc as any).lastAutoTable?.finalY || 70;
+      doc.text("Notes:", 20, finalY + 20);
+      doc.setFontSize(10);
+      doc.text(quote.notes, 20, finalY + 28, { maxWidth: 170 });
+    }
+
+    doc.save(`Quote_${quote.quoteNumber}.pdf`);
+  };
 
   const convertToJob = async (quote: any) => {
     try {
@@ -198,7 +236,15 @@ const Quotes = () => {
                     className="text-muted-foreground hover:text-white"
                     onClick={() => setEditingQuote(quote)}
                   >
-                    <ArrowUpRight className="h-5 w-5" />
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => downloadQuote(quote)}
+                  >
+                    <Download className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
