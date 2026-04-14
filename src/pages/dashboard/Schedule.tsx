@@ -27,6 +27,7 @@ const Schedule = () => {
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingVisit, setEditingVisit] = useState<any>(null);
 
   useEffect(() => {
     // In a real app, we'd filter by date range
@@ -82,6 +83,26 @@ const Schedule = () => {
         </div>
       </div>
 
+      <Dialog open={!!editingVisit} onOpenChange={(open) => !open && setEditingVisit(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Visit</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingVisit && (
+              <VisitForm 
+                initialData={{
+                  ...editingVisit,
+                  scheduledAt: editingVisit.scheduledAt?.toDate().toISOString().slice(0, 16) || ""
+                }}
+                onSuccess={() => setEditingVisit(null)} 
+                onCancel={() => setEditingVisit(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-6">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading schedule...</div>
@@ -89,7 +110,7 @@ const Schedule = () => {
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No visits scheduled for this period.</div>
         ) : (
           visits.map((visit) => (
-            <div key={visit.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group">
+            <div key={visit.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingVisit(visit)}>
               <div className="w-24 text-center border-r border-white/10 pr-6">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
                   {visit.scheduledAt?.toDate().toLocaleDateString('en-US', { weekday: 'short' })}

@@ -24,6 +24,7 @@ const Requests = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
@@ -65,6 +66,23 @@ const Requests = () => {
         </Dialog>
       </div>
 
+      <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Request</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingRequest && (
+              <RequestFormInternal 
+                initialData={editingRequest}
+                onSuccess={() => setEditingRequest(null)} 
+                onCancel={() => setEditingRequest(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading requests...</div>
@@ -72,7 +90,7 @@ const Requests = () => {
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No requests found.</div>
         ) : (
           requests.map((req) => (
-            <div key={req.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+            <div key={req.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingRequest(req)}>
               <div className="flex items-center gap-6">
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                   <UserIcon className="h-6 w-6 text-muted-foreground" />

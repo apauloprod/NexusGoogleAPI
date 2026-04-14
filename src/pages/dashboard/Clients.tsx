@@ -29,6 +29,7 @@ const Clients = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "clients"), orderBy("name", "asc"));
@@ -75,6 +76,23 @@ const Clients = () => {
         </Dialog>
       </div>
 
+      <Dialog open={!!editingClient} onOpenChange={(open) => !open && setEditingClient(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Client</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingClient && (
+              <ClientForm 
+                initialData={editingClient}
+                onSuccess={() => setEditingClient(null)} 
+                onCancel={() => setEditingClient(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input 
@@ -94,7 +112,12 @@ const Clients = () => {
           filteredClients.map((client) => (
             <div key={client.id} className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-muted-foreground hover:text-white"
+                  onClick={() => setEditingClient(client)}
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </div>

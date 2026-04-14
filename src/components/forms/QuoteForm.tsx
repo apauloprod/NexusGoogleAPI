@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 const quoteSchema = z.object({
@@ -37,11 +37,12 @@ const quoteSchema = z.object({
 type QuoteFormValues = z.infer<typeof quoteSchema>;
 
 interface QuoteFormProps {
+  initialData?: QuoteFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function QuoteForm({ onSuccess, onCancel }: QuoteFormProps) {
+export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
 
@@ -60,7 +61,7 @@ export function QuoteForm({ onSuccess, onCancel }: QuoteFormProps) {
 
   const form = useForm({
     resolver: zodResolver(quoteSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       clientId: "",
       quoteNumber: `Q-${Math.floor(1000 + Math.random() * 9000)}`,
       items: [{ description: "", price: 0 }],
@@ -79,17 +80,27 @@ export function QuoteForm({ onSuccess, onCancel }: QuoteFormProps) {
       const selectedClient = clients.find(c => c.id === values.clientId);
       const total = values.items.reduce((sum, item) => sum + item.price, 0);
       
-      await addDoc(collection(db, "quotes"), {
-        ...values,
-        clientName: selectedClient?.name || "Unknown Client",
-        total,
-        status: "sent",
-        createdAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        const quoteRef = doc(db, "quotes", initialData.id);
+        await updateDoc(quoteRef, {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          total,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, "quotes"), {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          total,
+          status: "sent",
+          createdAt: serverTimestamp(),
+        });
+      }
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "quotes");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "quotes");
     } finally {
       setIsSubmitting(false);
     }
@@ -222,7 +233,7 @@ export function QuoteForm({ onSuccess, onCancel }: QuoteFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Quote"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Quote" : "Create Quote")}
           </Button>
         </div>
       </form>

@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 const invoiceSchema = z.object({
@@ -34,11 +34,12 @@ const invoiceSchema = z.object({
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 
 interface InvoiceFormProps {
+  initialData?: InvoiceFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function InvoiceForm({ onSuccess, onCancel }: InvoiceFormProps) {
+export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
 
@@ -57,7 +58,7 @@ export function InvoiceForm({ onSuccess, onCancel }: InvoiceFormProps) {
 
   const form = useForm({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       clientId: "",
       invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
       total: 0,
@@ -70,18 +71,28 @@ export function InvoiceForm({ onSuccess, onCancel }: InvoiceFormProps) {
     setIsSubmitting(true);
     try {
       const selectedClient = clients.find(c => c.id === values.clientId);
-      await addDoc(collection(db, "invoices"), {
-        ...values,
-        clientName: selectedClient?.name || "Unknown Client",
-        status: "sent",
-        paidAmount: 0,
-        dueDate: new Date(values.dueDate),
-        createdAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        const invoiceRef = doc(db, "invoices", initialData.id);
+        await updateDoc(invoiceRef, {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          dueDate: new Date(values.dueDate),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, "invoices"), {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          status: "sent",
+          paidAmount: 0,
+          dueDate: new Date(values.dueDate),
+          createdAt: serverTimestamp(),
+        });
+      }
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "invoices");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "invoices");
     } finally {
       setIsSubmitting(false);
     }
@@ -182,7 +193,7 @@ export function InvoiceForm({ onSuccess, onCancel }: InvoiceFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Invoice"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Invoice" : "Create Invoice")}
           </Button>
         </div>
       </form>

@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 const jobSchema = z.object({
@@ -33,11 +33,12 @@ const jobSchema = z.object({
 type JobFormValues = z.infer<typeof jobSchema>;
 
 interface JobFormProps {
+  initialData?: JobFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function JobForm({ onSuccess, onCancel }: JobFormProps) {
+export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
 
@@ -56,7 +57,7 @@ export function JobForm({ onSuccess, onCancel }: JobFormProps) {
 
   const form = useForm<JobFormValues>({
     resolver: zodResolver(jobSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       title: "",
       clientId: "",
       status: "active",
@@ -68,18 +69,27 @@ export function JobForm({ onSuccess, onCancel }: JobFormProps) {
     setIsSubmitting(true);
     try {
       const selectedClient = clients.find(c => c.id === values.clientId);
-      await addDoc(collection(db, "jobs"), {
-        ...values,
-        clientName: selectedClient?.name || "Unknown Client",
-        notesCount: values.notes ? 1 : 0,
-        photosCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        const jobRef = doc(db, "jobs", initialData.id);
+        await updateDoc(jobRef, {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, "jobs"), {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          notesCount: values.notes ? 1 : 0,
+          photosCount: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "jobs");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "jobs");
     } finally {
       setIsSubmitting(false);
     }
@@ -174,7 +184,7 @@ export function JobForm({ onSuccess, onCancel }: JobFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Job"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Job" : "Create Job")}
           </Button>
         </div>
       </form>

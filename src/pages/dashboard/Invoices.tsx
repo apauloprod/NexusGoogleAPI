@@ -7,7 +7,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Download
+  Download,
+  Edit2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ const Invoices = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
@@ -81,6 +83,26 @@ const Invoices = () => {
         </Dialog>
       </div>
 
+      <Dialog open={!!editingInvoice} onOpenChange={(open) => !open && setEditingInvoice(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Invoice</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingInvoice && (
+              <InvoiceForm 
+                initialData={{
+                  ...editingInvoice,
+                  dueDate: editingInvoice.dueDate?.toDate().toISOString().split('T')[0] || ""
+                }}
+                onSuccess={() => setEditingInvoice(null)} 
+                onCancel={() => setEditingInvoice(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading invoices...</div>
@@ -113,9 +135,19 @@ const Invoices = () => {
                     {inv.status === 'paid' ? 'Fully Paid' : `$${(inv.total - (inv.paidAmount || 0)).toLocaleString()} balance`}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <Download className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => setEditingInvoice(inv)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                    <Download className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))

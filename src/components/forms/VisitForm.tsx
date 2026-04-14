@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 const visitSchema = z.object({
@@ -34,11 +34,12 @@ const visitSchema = z.object({
 type VisitFormValues = z.infer<typeof visitSchema>;
 
 interface VisitFormProps {
+  initialData?: VisitFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function VisitForm({ onSuccess, onCancel }: VisitFormProps) {
+export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
 
@@ -57,7 +58,7 @@ export function VisitForm({ onSuccess, onCancel }: VisitFormProps) {
 
   const form = useForm<VisitFormValues>({
     resolver: zodResolver(visitSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       title: "",
       clientId: "",
       address: "",
@@ -70,17 +71,27 @@ export function VisitForm({ onSuccess, onCancel }: VisitFormProps) {
     setIsSubmitting(true);
     try {
       const selectedClient = clients.find(c => c.id === values.clientId);
-      await addDoc(collection(db, "visits"), {
-        ...values,
-        clientName: selectedClient?.name || "Unknown Client",
-        status: "scheduled",
-        scheduledAt: new Date(values.scheduledAt),
-        createdAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        const visitRef = doc(db, "visits", initialData.id);
+        await updateDoc(visitRef, {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          scheduledAt: new Date(values.scheduledAt),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, "visits"), {
+          ...values,
+          clientName: selectedClient?.name || "Unknown Client",
+          status: "scheduled",
+          scheduledAt: new Date(values.scheduledAt),
+          createdAt: serverTimestamp(),
+        });
+      }
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "visits");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "visits");
     } finally {
       setIsSubmitting(false);
     }
@@ -185,7 +196,7 @@ export function VisitForm({ onSuccess, onCancel }: VisitFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Scheduling..." : "Schedule Visit"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Scheduling...") : (initialData?.id ? "Update Visit" : "Schedule Visit")}
           </Button>
         </div>
       </form>

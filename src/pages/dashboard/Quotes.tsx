@@ -7,12 +7,13 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Send
+  Send,
+  Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -27,6 +28,7 @@ const Quotes = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
@@ -39,6 +41,31 @@ const Quotes = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const convertToJob = async (quote: any) => {
+    try {
+      await addDoc(collection(db, "jobs"), {
+        title: `Job from Quote #${quote.quoteNumber}`,
+        clientId: quote.clientId,
+        clientName: quote.clientName,
+        status: "active",
+        notes: quote.notes || "",
+        quoteId: quote.id,
+        total: quote.total,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      
+      // Update quote status
+      const quoteRef = doc(db, "quotes", quote.id);
+      await updateDoc(quoteRef, {
+        status: "approved",
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "jobs");
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -81,6 +108,23 @@ const Quotes = () => {
         </Dialog>
       </div>
 
+      <Dialog open={!!editingQuote} onOpenChange={(open) => !open && setEditingQuote(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Quote</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingQuote && (
+              <QuoteForm 
+                initialData={editingQuote}
+                onSuccess={() => setEditingQuote(null)} 
+                onCancel={() => setEditingQuote(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading quotes...</div>
@@ -113,9 +157,27 @@ const Quotes = () => {
                     {quote.items?.length || 0} items
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <ArrowUpRight className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {quote.status !== 'approved' && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs gap-1 hover:text-emerald-500"
+                      onClick={() => convertToJob(quote)}
+                    >
+                      <Briefcase className="h-3 w-3" />
+                      Approve & Job
+                    </Button>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => setEditingQuote(quote)}
+                  >
+                    <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))

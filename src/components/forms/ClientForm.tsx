@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { useState } from "react";
 
 const clientSchema = z.object({
@@ -28,16 +28,17 @@ const clientSchema = z.object({
 type ClientFormValues = z.infer<typeof clientSchema>;
 
 interface ClientFormProps {
+  initialData?: ClientFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function ClientForm({ onSuccess, onCancel }: ClientFormProps) {
+export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       name: "",
       company: "",
       email: "",
@@ -50,15 +51,23 @@ export function ClientForm({ onSuccess, onCancel }: ClientFormProps) {
   async function onSubmit(values: ClientFormValues) {
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "clients"), {
-        ...values,
-        jobsCount: 0,
-        createdAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        const clientRef = doc(db, "clients", initialData.id);
+        await updateDoc(clientRef, {
+          ...values,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, "clients"), {
+          ...values,
+          jobsCount: 0,
+          createdAt: serverTimestamp(),
+        });
+      }
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "clients");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "clients");
     } finally {
       setIsSubmitting(false);
     }
@@ -162,7 +171,7 @@ export function ClientForm({ onSuccess, onCancel }: ClientFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Adding..." : "Add Client"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Adding...") : (initialData?.id ? "Update Client" : "Add Client")}
           </Button>
         </div>
       </form>

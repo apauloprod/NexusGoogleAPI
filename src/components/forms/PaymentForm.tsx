@@ -32,18 +32,18 @@ const paymentSchema = z.object({
 type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 interface PaymentFormProps {
+  initialData?: PaymentFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function PaymentForm({ onSuccess, onCancel }: PaymentFormProps) {
+export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchInvoices() {
       try {
-        // Fetch only unpaid or partially paid invoices
         const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
         const snapshot = await getDocs(q);
         setInvoices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -56,7 +56,7 @@ export function PaymentForm({ onSuccess, onCancel }: PaymentFormProps) {
 
   const form = useForm({
     resolver: zodResolver(paymentSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       invoiceId: "",
       amount: 0,
       method: "Credit Card",
@@ -69,30 +69,49 @@ export function PaymentForm({ onSuccess, onCancel }: PaymentFormProps) {
     try {
       const selectedInvoice = invoices.find(i => i.id === values.invoiceId);
       
-      // 1. Record the payment
-      await addDoc(collection(db, "payments"), {
-        ...values,
-        clientName: selectedInvoice?.clientName || "Unknown Client",
-        invoiceNumber: selectedInvoice?.invoiceNumber || "Unknown",
-        status: "success",
-        createdAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        // Edit existing payment
+        const paymentRef = doc(db, "payments", initialData.id);
+        await updateDoc(paymentRef, {
+          ...values,
+          updatedAt: serverTimestamp(),
+        });
 
-      // 2. Update the invoice paid amount and status
-      const invoiceRef = doc(db, "invoices", values.invoiceId);
-      const newPaidAmount = (selectedInvoice?.paidAmount || 0) + values.amount;
-      const isPaid = newPaidAmount >= (selectedInvoice?.total || 0);
+        // Update invoice if amount changed
+        if (values.amount !== initialData.amount) {
+          const invoiceRef = doc(db, "invoices", values.invoiceId);
+          const diff = values.amount - initialData.amount;
+          await updateDoc(invoiceRef, {
+            paidAmount: increment(diff),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } else {
+        // Record new payment
+        await addDoc(collection(db, "payments"), {
+          ...values,
+          clientName: selectedInvoice?.clientName || "Unknown Client",
+          invoiceNumber: selectedInvoice?.invoiceNumber || "Unknown",
+          status: "success",
+          createdAt: serverTimestamp(),
+        });
 
-      await updateDoc(invoiceRef, {
-        paidAmount: increment(values.amount),
-        status: isPaid ? "paid" : "sent",
-        updatedAt: serverTimestamp(),
-      });
+        // Update the invoice paid amount and status
+        const invoiceRef = doc(db, "invoices", values.invoiceId);
+        const newPaidAmount = (selectedInvoice?.paidAmount || 0) + values.amount;
+        const isPaid = newPaidAmount >= (selectedInvoice?.total || 0);
+
+        await updateDoc(invoiceRef, {
+          paidAmount: increment(values.amount),
+          status: isPaid ? "paid" : "sent",
+          updatedAt: serverTimestamp(),
+        });
+      }
 
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "payments");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "payments");
     } finally {
       setIsSubmitting(false);
     }
@@ -177,7 +196,7 @@ export function PaymentForm({ onSuccess, onCancel }: PaymentFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Processing..." : "Record Payment"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Processing...") : (initialData?.id ? "Update Payment" : "Record Payment")}
           </Button>
         </div>
       </form>

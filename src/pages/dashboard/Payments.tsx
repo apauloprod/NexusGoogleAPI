@@ -7,7 +7,8 @@ import {
   Clock,
   CheckCircle2,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Edit2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ const Payments = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "payments"), orderBy("createdAt", "desc"));
@@ -52,7 +54,9 @@ const Payments = () => {
             <TrendingUp className="h-4 w-4 text-emerald-500" />
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total Revenue</p>
-              <p className="text-lg font-bold">$42,850.00</p>
+              <p className="text-lg font-bold">
+                ${payments.reduce((acc, p) => acc + (p.amount || 0), 0).toLocaleString()}
+              </p>
             </div>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -76,6 +80,23 @@ const Payments = () => {
           </Dialog>
         </div>
       </div>
+
+      <Dialog open={!!editingPayment} onOpenChange={(open) => !open && setEditingPayment(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Payment</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingPayment && (
+              <PaymentForm 
+                initialData={editingPayment}
+                onSuccess={() => setEditingPayment(null)} 
+                onCancel={() => setEditingPayment(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4">
         {loading ? (
@@ -109,9 +130,19 @@ const Payments = () => {
                     via {payment.method || 'Credit Card'}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <ArrowUpRight className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => setEditingPayment(payment)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                    <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))

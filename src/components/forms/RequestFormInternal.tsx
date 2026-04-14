@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { useState } from "react";
 
 const requestSchema = z.object({
@@ -29,18 +29,19 @@ const requestSchema = z.object({
 type RequestFormValues = z.infer<typeof requestSchema>;
 
 interface RequestFormProps {
+  initialData?: RequestFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
 const AVAILABLE_SERVICES = ["Data Strategy", "AI Implementation", "Advanced Analytics", "Custom Dashboards"];
 
-export function RequestFormInternal({ onSuccess, onCancel }: RequestFormProps) {
+export function RequestFormInternal({ initialData, onSuccess, onCancel }: RequestFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(requestSchema),
-    defaultValues: {
+    defaultValues: initialData || {
       name: "",
       email: "",
       phone: "",
@@ -53,15 +54,23 @@ export function RequestFormInternal({ onSuccess, onCancel }: RequestFormProps) {
   async function onSubmit(values: RequestFormValues) {
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "requests"), {
-        ...values,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      });
+      if (initialData?.id) {
+        const requestRef = doc(db, "requests", initialData.id);
+        await updateDoc(requestRef, {
+          ...values,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, "requests"), {
+          ...values,
+          status: "pending",
+          createdAt: serverTimestamp(),
+        });
+      }
       form.reset();
       onSuccess?.();
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, "requests");
+      handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "requests");
     } finally {
       setIsSubmitting(false);
     }
@@ -181,7 +190,7 @@ export function RequestFormInternal({ onSuccess, onCancel }: RequestFormProps) {
             Cancel
           </Button>
           <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Request"}
+            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Request" : "Create Request")}
           </Button>
         </div>
       </form>

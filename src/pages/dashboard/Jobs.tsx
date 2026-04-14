@@ -7,12 +7,13 @@ import {
   Clock,
   MessageSquare,
   ImageIcon,
-  MoreVertical
+  MoreVertical,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -27,6 +28,7 @@ const Jobs = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<any>(null);
 
   useEffect(() => {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
@@ -39,6 +41,33 @@ const Jobs = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const convertToInvoice = async (job: any) => {
+    try {
+      await addDoc(collection(db, "invoices"), {
+        invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+        clientId: job.clientId,
+        clientName: job.clientName,
+        total: job.total || 0,
+        status: "sent",
+        paidAmount: 0,
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        jobId: job.id,
+        notes: job.notes || "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      
+      // Update job status
+      const jobRef = doc(db, "jobs", job.id);
+      await updateDoc(jobRef, {
+        status: "completed",
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "invoices");
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -81,6 +110,23 @@ const Jobs = () => {
         </Dialog>
       </div>
 
+      <Dialog open={!!editingJob} onOpenChange={(open) => !open && setEditingJob(null)}>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Job</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4">
+            {editingJob && (
+              <JobForm 
+                initialData={editingJob}
+                onSuccess={() => setEditingJob(null)} 
+                onCancel={() => setEditingJob(null)} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading jobs...</div>
@@ -116,9 +162,27 @@ const Jobs = () => {
                   </div>
                 </div>
                 <div className="h-8 w-px bg-white/5 mx-2" />
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <ArrowUpRight className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {job.status !== 'completed' && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs gap-1 hover:text-emerald-500"
+                      onClick={() => convertToInvoice(job)}
+                    >
+                      <FileText className="h-3 w-3" />
+                      Invoice
+                    </Button>
+                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-white"
+                    onClick={() => setEditingJob(job)}
+                  >
+                    <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))
