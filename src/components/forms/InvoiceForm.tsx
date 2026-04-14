@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -53,13 +53,38 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
     resolver: zodResolver(invoiceSchema),
     defaultValues: initialData || {
       clientId: "",
-      invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNumber: "",
       total: 0,
       items: [{ description: "", price: 0 }],
       dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       notes: "",
     },
   });
+
+  useEffect(() => {
+    if (!initialData?.id && !form.getValues("invoiceNumber")) {
+      const fetchLatestInvoiceNumber = async () => {
+        try {
+          const q = query(collection(db, "invoices"), orderBy("invoiceNumber", "desc"), limit(1));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const latestInvoice = snapshot.docs[0].data();
+            const latestStr = latestInvoice.invoiceNumber || "";
+            const match = latestStr.match(/\d+/);
+            const latestNumber = match ? parseInt(match[0]) : 0;
+            const nextNumber = `INV-${(latestNumber + 1).toString().padStart(4, '0')}`;
+            form.setValue("invoiceNumber", nextNumber);
+          } else {
+            form.setValue("invoiceNumber", "INV-0001");
+          }
+        } catch (error) {
+          console.error("Error fetching latest invoice number:", error);
+          form.setValue("invoiceNumber", "INV-0001");
+        }
+      };
+      fetchLatestInvoiceNumber();
+    }
+  }, [initialData, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,

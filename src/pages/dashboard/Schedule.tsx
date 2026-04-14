@@ -172,11 +172,15 @@ const Schedule = () => {
                   <h3 className="font-bold text-xl">{item.title}</h3>
                   <Badge variant="outline" className={cn(
                     "text-[10px] uppercase tracking-wider",
-                    item.type === 'job' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-white/5 border-white/10"
+                    item.type === 'job' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-white/5 border-white/10",
+                    item.status === 'confirmed' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                   )}>
                     {item.type === 'job' ? 'Job' : 'Visit'}
                   </Badge>
-                  <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">
+                  <Badge variant="outline" className={cn(
+                    "bg-white/5 border-white/10 text-[10px] uppercase tracking-wider",
+                    item.status === 'confirmed' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                  )}>
                     {item.status || 'Scheduled'}
                   </Badge>
                 </div>

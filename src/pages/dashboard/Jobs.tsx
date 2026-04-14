@@ -44,8 +44,17 @@ const Jobs = () => {
 
   const convertToInvoice = async (job: any) => {
     try {
+      let invoiceNumber = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (job.quoteNumber) {
+        // Extract the numeric part from Q-0001 and use it for INV-0001
+        const match = job.quoteNumber.match(/\d+/);
+        if (match) {
+          invoiceNumber = `INV-${match[0]}`;
+        }
+      }
+
       await addDoc(collection(db, "invoices"), {
-        invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+        invoiceNumber: invoiceNumber,
         clientId: job.clientId,
         clientName: job.clientName,
         total: job.total || 0,
@@ -54,6 +63,7 @@ const Jobs = () => {
         paidAmount: 0,
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         jobId: job.id,
+        quoteNumber: job.quoteNumber || "",
         notes: job.notes || "",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

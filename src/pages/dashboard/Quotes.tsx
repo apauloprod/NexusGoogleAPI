@@ -51,6 +51,7 @@ const Quotes = () => {
         status: "active",
         notes: quote.notes || "",
         quoteId: quote.id,
+        quoteNumber: quote.quoteNumber,
         items: quote.items || [],
         total: quote.total,
         createdAt: serverTimestamp(),

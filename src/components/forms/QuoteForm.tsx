@@ -74,15 +74,17 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
             const latestQuote = snapshot.docs[0].data();
-            const latestNumber = parseInt(latestQuote.quoteNumber) || 0;
-            const nextNumber = (latestNumber + 1).toString().padStart(4, '0');
+            const latestStr = latestQuote.quoteNumber || "";
+            const match = latestStr.match(/\d+/);
+            const latestNumber = match ? parseInt(match[0]) : 0;
+            const nextNumber = `Q-${(latestNumber + 1).toString().padStart(4, '0')}`;
             form.setValue("quoteNumber", nextNumber);
           } else {
-            form.setValue("quoteNumber", "0001");
+            form.setValue("quoteNumber", "Q-0001");
           }
         } catch (error) {
           console.error("Error fetching latest quote number:", error);
-          form.setValue("quoteNumber", "0001");
+          form.setValue("quoteNumber", "Q-0001");
         }
       };
       fetchLatestQuoteNumber();
