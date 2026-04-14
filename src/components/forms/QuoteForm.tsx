@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -35,8 +35,7 @@ const quoteSchema = z.object({
   })).min(1, "At least one item is required"),
   notes: z.string().optional(),
   // Scheduling fields
-  scheduledDate: z.string().optional(),
-  scheduledTime: z.string().optional(),
+  scheduledAt: z.string().optional(),
   duration: z.string().optional(),
 });
 
@@ -48,6 +47,8 @@ interface QuoteFormProps {
   onCancel?: () => void;
 }
 
+import { SchedulePicker } from "../SchedulePicker";
+
 export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,8 +59,9 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       quoteNumber: initialData?.quoteNumber || `Q-${Math.floor(1000 + Math.random() * 9000)}`,
       items: initialData?.items || [{ description: "", price: 0 }],
       notes: initialData?.notes || "",
-      scheduledDate: initialData?.scheduledDate || "",
-      scheduledTime: initialData?.scheduledTime || "09:00",
+      scheduledAt: initialData?.scheduledAt 
+        ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
+        : (initialData?.scheduledDate && initialData?.scheduledTime ? new Date(`${initialData.scheduledDate}T${initialData.scheduledTime}`).toISOString() : ""),
       duration: initialData?.duration || "1h",
     },
   });
@@ -99,16 +101,14 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       }
 
       // Handle scheduling
-      if (values.scheduledDate && values.scheduledTime) {
+      if (values.scheduledAt) {
+        const scheduledDate = new Date(values.scheduledAt);
         // Create or update associated visit
-        // For simplicity, we create a new visit if it's a new quote or if we want to track it
-        // In a real app, we might check if a visit already exists for this quote
         await addDoc(collection(db, "visits"), {
           clientId: values.clientId,
           clientName,
           title: `Quote ${values.quoteNumber} Visit`,
-          date: values.scheduledDate,
-          time: values.scheduledTime,
+          scheduledAt: Timestamp.fromDate(scheduledDate),
           duration: values.duration || "1h",
           status: "pending", // Always pending when created from quote
           quoteId: quoteId,
@@ -249,28 +249,19 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
 
         <div className="space-y-3 pt-2 border-t border-white/5">
           <FormLabel className="text-white/50 text-xs uppercase font-bold tracking-wider">Scheduling (Optional)</FormLabel>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="scheduledDate"
+              name="scheduledAt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date</FormLabel>
+                  <FormLabel>Date & Time</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} className="bg-white/5 border-white/10" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="scheduledTime"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Time</FormLabel>
-                  <FormControl>
-                    <Input type="time" {...field} className="bg-white/5 border-white/10" />
+                    <SchedulePicker 
+                      value={field.value} 
+                      onChange={field.onChange} 
+                      placeholder="Select a time slot..."
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

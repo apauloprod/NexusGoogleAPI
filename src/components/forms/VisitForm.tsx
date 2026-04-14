@@ -41,6 +41,8 @@ interface VisitFormProps {
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
 
+import { SchedulePicker } from "../SchedulePicker";
+
 export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -166,7 +168,11 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
             <FormItem>
               <FormLabel>Scheduled Date & Time</FormLabel>
               <FormControl>
-                <Input type="datetime-local" {...field} className="bg-white/5 border-white/10" />
+                <SchedulePicker 
+                  value={field.value} 
+                  onChange={field.onChange} 
+                  placeholder="Select a time slot..."
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

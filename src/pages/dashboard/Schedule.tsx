@@ -93,7 +93,7 @@ const Schedule = () => {
               <VisitForm 
                 initialData={{
                   ...editingVisit,
-                  scheduledAt: editingVisit.scheduledAt?.toDate().toISOString().slice(0, 16) || ""
+                  scheduledAt: editingVisit.scheduledAt?.toDate().toISOString() || ""
                 }}
                 onSuccess={() => setEditingVisit(null)} 
                 onCancel={() => setEditingVisit(null)} 
