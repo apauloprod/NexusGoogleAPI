@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -35,6 +35,8 @@ const jobSchema = z.object({
     price: z.coerce.number().min(0, "Price must be positive"),
   })),
   notes: z.string().optional(),
+  scheduledAt: z.string().optional(),
+  duration: z.string().optional(),
 });
 
 type JobFormValues = z.infer<typeof jobSchema>;
@@ -45,17 +47,23 @@ interface JobFormProps {
   onCancel?: () => void;
 }
 
+import { SchedulePicker } from "../SchedulePicker";
+
 export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(jobSchema),
-    defaultValues: initialData || {
-      title: "",
-      clientId: "",
-      status: "active",
-      items: [{ description: "", price: 0 }],
-      notes: "",
+    defaultValues: {
+      title: initialData?.title || "",
+      clientId: initialData?.clientId || "",
+      status: initialData?.status || "active",
+      items: initialData?.items || [{ description: "", price: 0 }],
+      notes: initialData?.notes || "",
+      scheduledAt: initialData?.scheduledAt 
+        ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
+        : "",
+      duration: initialData?.duration || "1h",
     },
   });
 
@@ -73,23 +81,23 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
       const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
       
+      const jobData = {
+        ...values,
+        clientName,
+        total,
+        scheduledAt: values.scheduledAt ? Timestamp.fromDate(new Date(values.scheduledAt)) : null,
+        updatedAt: serverTimestamp(),
+      };
+
       if (initialData?.id) {
         const jobRef = doc(db, "jobs", initialData.id);
-        await updateDoc(jobRef, {
-          ...values,
-          clientName,
-          total,
-          updatedAt: serverTimestamp(),
-        });
+        await updateDoc(jobRef, jobData);
       } else {
         await addDoc(collection(db, "jobs"), {
-          ...values,
-          clientName,
-          total,
+          ...jobData,
           notesCount: values.notes ? 1 : 0,
           photosCount: 0,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
         });
 
         // Update client status to active
@@ -124,6 +132,50 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             </FormItem>
           )}
         />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="scheduledAt"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Scheduled Date & Time</FormLabel>
+                <FormControl>
+                  <SchedulePicker 
+                    value={field.value} 
+                    onChange={field.onChange} 
+                    placeholder="Select a time slot..."
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="duration"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Duration</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="bg-white/5 border-white/10">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent className="bg-black border-white/10">
+                    <SelectItem value="30m">30 mins</SelectItem>
+                    <SelectItem value="1h">1 hour</SelectItem>
+                    <SelectItem value="2h">2 hours</SelectItem>
+                    <SelectItem value="4h">4 hours</SelectItem>
+                    <SelectItem value="8h">Full day</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField

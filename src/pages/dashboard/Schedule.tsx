@@ -21,26 +21,53 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { VisitForm } from "../../components/forms/VisitForm";
+import { JobForm } from "../../components/forms/JobForm";
+import { cn } from "@/lib/utils";
 
 const Schedule = () => {
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingVisit, setEditingVisit] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
 
   useEffect(() => {
-    // In a real app, we'd filter by date range
-    const q = query(collection(db, "visits"), orderBy("scheduledAt", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setVisits(data);
-      setLoading(false);
+    const visitsQuery = query(collection(db, "visits"), orderBy("scheduledAt", "asc"));
+    const jobsQuery = query(collection(db, "jobs"), where("status", "==", "active"), orderBy("scheduledAt", "asc"));
+
+    const unsubscribeVisits = onSnapshot(visitsQuery, (snapshot) => {
+      const visitsData = snapshot.docs.map(doc => ({ id: doc.id, type: 'visit', ...doc.data() }));
+      updateSchedule(visitsData, 'visits');
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "visits");
     });
-    return () => unsubscribe();
+
+    const unsubscribeJobs = onSnapshot(jobsQuery, (snapshot) => {
+      const jobsData = snapshot.docs.map(doc => ({ id: doc.id, type: 'job', ...doc.data() }));
+      updateSchedule(jobsData, 'jobs');
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "jobs");
+    });
+
+    return () => {
+      unsubscribeVisits();
+      unsubscribeJobs();
+    };
   }, []);
+
+  const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
+
+  const updateSchedule = (data: any[], type: 'visits' | 'jobs') => {
+    setScheduleData(prev => {
+      const newData = { ...prev, [type]: data };
+      const merged = [...newData.visits, ...newData.jobs]
+        .filter(item => item.scheduledAt)
+        .sort((a, b) => a.scheduledAt.toDate() - b.scheduledAt.toDate());
+      setVisits(merged);
+      setLoading(false);
+      return newData;
+    });
+  };
 
   return (
     <div className="p-8">
@@ -83,20 +110,28 @@ const Schedule = () => {
         </div>
       </div>
 
-      <Dialog open={!!editingVisit} onOpenChange={(open) => !open && setEditingVisit(null)}>
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Visit</DialogTitle>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">
+              Edit {editingItem?.type === 'job' ? 'Job' : 'Visit'}
+            </DialogTitle>
           </DialogHeader>
           <div className="pt-4">
-            {editingVisit && (
+            {editingItem?.type === 'job' ? (
+              <JobForm 
+                initialData={editingItem}
+                onSuccess={() => setEditingItem(null)} 
+                onCancel={() => setEditingItem(null)} 
+              />
+            ) : editingItem && (
               <VisitForm 
                 initialData={{
-                  ...editingVisit,
-                  scheduledAt: editingVisit.scheduledAt?.toDate().toISOString() || ""
+                  ...editingItem,
+                  scheduledAt: editingItem.scheduledAt?.toDate().toISOString() || ""
                 }}
-                onSuccess={() => setEditingVisit(null)} 
-                onCancel={() => setEditingVisit(null)} 
+                onSuccess={() => setEditingItem(null)} 
+                onCancel={() => setEditingItem(null)} 
               />
             )}
           </div>
@@ -107,29 +142,35 @@ const Schedule = () => {
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading schedule...</div>
         ) : visits.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No visits scheduled for this period.</div>
+          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No items scheduled for this period.</div>
         ) : (
-          visits.map((visit) => (
-            <div key={visit.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingVisit(visit)}>
+          visits.map((item) => (
+            <div key={item.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
               <div className="w-24 text-center border-r border-white/10 pr-6">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                  {visit.scheduledAt?.toDate().toLocaleDateString('en-US', { weekday: 'short' })}
+                  {item.scheduledAt?.toDate().toLocaleDateString('en-US', { weekday: 'short' })}
                 </p>
                 <p className="text-3xl font-bold mt-1">
-                  {visit.scheduledAt?.toDate().getDate()}
+                  {item.scheduledAt?.toDate().getDate()}
                 </p>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <h3 className="font-bold text-xl">{visit.title}</h3>
+                  <h3 className="font-bold text-xl">{item.title}</h3>
+                  <Badge variant="outline" className={cn(
+                    "text-[10px] uppercase tracking-wider",
+                    item.type === 'job' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-white/5 border-white/10"
+                  )}>
+                    {item.type === 'job' ? 'Job' : 'Visit'}
+                  </Badge>
                   <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">
-                    {visit.status || 'Scheduled'}
+                    {item.status || 'Scheduled'}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {visit.scheduledAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  <span className="flex items-center gap-1.5"><UserIcon className="h-4 w-4" /> {visit.clientName}</span>
-                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {visit.address}</span>
+                  <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {item.scheduledAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="flex items-center gap-1.5"><UserIcon className="h-4 w-4" /> {item.clientName}</span>
+                  {item.address && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {item.address}</span>}
                 </div>
               </div>
               <div className="flex -space-x-2">

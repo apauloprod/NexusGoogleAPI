@@ -65,17 +65,27 @@ export function SchedulePicker({ value, onChange, placeholder = "Select date and
       const start = startOfDay(selectedDate);
       const end = endOfDay(selectedDate);
 
-      const q = query(
+      const visitsQuery = query(
         collection(db, "visits"),
         where("scheduledAt", ">=", Timestamp.fromDate(start)),
         where("scheduledAt", "<=", Timestamp.fromDate(end))
       );
 
-      const snapshot = await getDocs(q);
-      const busy = snapshot.docs.map(doc => {
+      const jobsQuery = query(
+        collection(db, "jobs"),
+        where("status", "==", "active"),
+        where("scheduledAt", ">=", Timestamp.fromDate(start)),
+        where("scheduledAt", "<=", Timestamp.fromDate(end))
+      );
+
+      const [visitsSnapshot, jobsSnapshot] = await Promise.all([
+        getDocs(visitsQuery),
+        getDocs(jobsQuery)
+      ]);
+
+      const processDocs = (snapshot: any, defaultTitle: string) => snapshot.docs.map((doc: any) => {
         const data = doc.data();
         const startTime = data.scheduledAt.toDate();
-        // Assume 1 hour duration if not specified
         const durationStr = data.duration || "1h";
         let durationMinutes = 60;
         if (durationStr.endsWith("h")) {
@@ -87,9 +97,14 @@ export function SchedulePicker({ value, onChange, placeholder = "Select date and
         return {
           start: startTime,
           end: addMinutes(startTime, durationMinutes),
-          title: data.title || "Busy"
+          title: data.title || defaultTitle
         };
       });
+
+      const busy = [
+        ...processDocs(visitsSnapshot, "Visit"),
+        ...processDocs(jobsSnapshot, "Active Job")
+      ];
       setBusySlots(busy);
     } catch (error) {
       console.error("Error fetching busy slots:", error);
