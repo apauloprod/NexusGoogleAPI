@@ -123,6 +123,24 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           createdAt: serverTimestamp(),
         });
         quoteId = docRef.id;
+
+        // Send Email with PDF
+        const clientData = clientDoc.exists() ? clientDoc.data() : null;
+        if (clientData?.email) {
+          try {
+            await fetch("/api/send-quote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                quote: { id: quoteId, ...quoteData },
+                clientEmail: clientData.email,
+                appUrl: window.location.origin,
+              }),
+            });
+          } catch (emailErr) {
+            console.error("Failed to send quote email:", emailErr);
+          }
+        }
       }
 
       // Handle scheduling

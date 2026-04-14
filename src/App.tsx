@@ -5,6 +5,7 @@ import { auth } from "./firebase";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import RequestForm from "./pages/RequestForm";
+import PublicQuoteApproval from "./pages/PublicQuoteApproval";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 export const AuthContext = createContext<{ user: User | null; loading: boolean }>({ user: null, loading: true });
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/proof" element={<LandingPage />} />
             <Route path="/contact" element={<LandingPage />} />
             <Route path="/request" element={<RequestForm />} />
+            <Route path="/quote/:quoteId/approve" element={<PublicQuoteApproval />} />
             <Route path="/dashboard/*" element={<Dashboard />} />
           </Routes>
         </Router>
