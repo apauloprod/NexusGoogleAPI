@@ -15,10 +15,20 @@ import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ClientForm } from "../../components/forms/ClientForm";
+
 const Clients = () => {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "clients"), orderBy("name", "asc"));
@@ -44,10 +54,25 @@ const Clients = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Clients</h1>
           <p className="text-muted-foreground">Manage your customer database and communication history.</p>
         </div>
-        <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-          <Plus className="h-4 w-4" />
-          Add Client
-        </Button>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+              <Plus className="h-4 w-4" />
+              Add Client
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold tracking-tighter">Add New Client</DialogTitle>
+            </DialogHeader>
+            <div className="pt-4">
+              <ClientForm 
+                onSuccess={() => setIsAddDialogOpen(false)} 
+                onCancel={() => setIsAddDialogOpen(false)} 
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="relative mb-8">

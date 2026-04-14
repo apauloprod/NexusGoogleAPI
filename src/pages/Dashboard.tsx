@@ -33,6 +33,17 @@ import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestor
 import { AuthContext } from "../App";
 import { useContext } from "react";
 
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ClientForm } from "../components/forms/ClientForm";
+import { VisitForm } from "../components/forms/VisitForm";
+import { RequestFormInternal } from "../components/forms/RequestFormInternal";
+
 // Import Dashboard Components
 import Requests from "./dashboard/Requests";
 import Quotes from "./dashboard/Quotes";
@@ -72,6 +83,8 @@ export default function Dashboard() {
   const { user, loading } = useContext(AuthContext);
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [activeForm, setActiveForm] = useState<"client" | "visit" | "request" | null>(null);
 
   if (loading) {
     return (
@@ -125,10 +138,83 @@ export default function Dashboard() {
       </div>
 
       <div className="px-4 mb-6">
-        <Button className="w-full bg-white text-black hover:bg-white/90 rounded-xl h-11 gap-2 font-bold">
-          <Plus className="h-5 w-5" />
-          Create New
-        </Button>
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full bg-white text-black hover:bg-white/90 rounded-xl h-11 gap-2 font-bold">
+              <Plus className="h-5 w-5" />
+              Create New
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold tracking-tighter">
+                {activeForm === "client" ? "Add New Client" : 
+                 activeForm === "visit" ? "Schedule New Visit" : 
+                 activeForm === "request" ? "Create New Request" : 
+                 "What would you like to create?"}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {!activeForm ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-32 gap-3 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("client")}
+                >
+                  <Users className="h-8 w-8" />
+                  <span>Client</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-32 gap-3 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("visit")}
+                >
+                  <Calendar className="h-8 w-8" />
+                  <span>Visit</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-32 gap-3 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("request")}
+                >
+                  <FileText className="h-8 w-8" />
+                  <span>Request</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-4">
+                {activeForm === "client" && (
+                  <ClientForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "visit" && (
+                  <VisitForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "request" && (
+                  <RequestFormInternal 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
 
       <ScrollArea className="flex-1 px-2">

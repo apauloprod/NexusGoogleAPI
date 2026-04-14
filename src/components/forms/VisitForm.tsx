@@ -1,0 +1,194 @@
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { db, handleFirestoreError, OperationType } from "../../firebase";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from "firebase/firestore";
+import { useState, useEffect } from "react";
+
+const visitSchema = z.object({
+  title: z.string().min(2, "Title must be at least 2 characters"),
+  clientId: z.string().min(1, "Please select a client"),
+  address: z.string().min(5, "Address must be at least 5 characters"),
+  scheduledAt: z.string().min(1, "Please select a date and time"),
+  notes: z.string().optional(),
+});
+
+type VisitFormValues = z.infer<typeof visitSchema>;
+
+interface VisitFormProps {
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
+
+export function VisitForm({ onSuccess, onCancel }: VisitFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clients, setClients] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchClients() {
+      try {
+        const q = query(collection(db, "clients"), orderBy("name", "asc"));
+        const snapshot = await getDocs(q);
+        setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error("Error fetching clients:", error);
+      }
+    }
+    fetchClients();
+  }, []);
+
+  const form = useForm<VisitFormValues>({
+    resolver: zodResolver(visitSchema),
+    defaultValues: {
+      title: "",
+      clientId: "",
+      address: "",
+      scheduledAt: "",
+      notes: "",
+    },
+  });
+
+  async function onSubmit(values: VisitFormValues) {
+    setIsSubmitting(true);
+    try {
+      const selectedClient = clients.find(c => c.id === values.clientId);
+      await addDoc(collection(db, "visits"), {
+        ...values,
+        clientName: selectedClient?.name || "Unknown Client",
+        status: "scheduled",
+        scheduledAt: new Date(values.scheduledAt),
+        createdAt: serverTimestamp(),
+      });
+      form.reset();
+      onSuccess?.();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "visits");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Visit Title</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g. On-site Consultation" {...field} className="bg-white/5 border-white/10" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="clientId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Client</FormLabel>
+              <Select onValueChange={(value) => {
+                field.onChange(value);
+                const client = clients.find(c => c.id === value);
+                if (client?.address) {
+                  form.setValue("address", client.address);
+                }
+              }} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger className="bg-white/5 border-white/10">
+                    <SelectValue placeholder="Select a client" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent className="bg-black border-white/10">
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location Address</FormLabel>
+              <FormControl>
+                <Input placeholder="123 Main St, City, State" {...field} className="bg-white/5 border-white/10" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="scheduledAt"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Scheduled Date & Time</FormLabel>
+              <FormControl>
+                <Input type="datetime-local" {...field} className="bg-white/5 border-white/10" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes (Optional)</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="Any specific instructions for this visit..." 
+                  {...field} 
+                  className="bg-white/5 border-white/10 min-h-[100px]" 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="flex justify-end gap-3 pt-4">
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
+            {isSubmitting ? "Scheduling..." : "Schedule Visit"}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}

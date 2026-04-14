@@ -11,9 +11,19 @@ import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { RequestFormInternal } from "../../components/forms/RequestFormInternal";
+
 const Requests = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
@@ -34,10 +44,25 @@ const Requests = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Requests</h1>
           <p className="text-muted-foreground">Manage incoming quote requests from potential clients.</p>
         </div>
-        <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-          <Plus className="h-4 w-4" />
-          Add Request
-        </Button>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+              <Plus className="h-4 w-4" />
+              Add Request
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Request</DialogTitle>
+            </DialogHeader>
+            <div className="pt-4">
+              <RequestFormInternal 
+                onSuccess={() => setIsAddDialogOpen(false)} 
+                onCancel={() => setIsAddDialogOpen(false)} 
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid gap-4">
