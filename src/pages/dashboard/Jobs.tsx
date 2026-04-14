@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { db, handleFirestoreError, OperationType } from "../../firebase";
+import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
 
 import { 
@@ -77,6 +77,14 @@ const Jobs = () => {
 
       const docRef = await addDoc(collection(db, "invoices"), invoiceData);
       const invoiceId = docRef.id;
+
+      // Log activity
+      await addDoc(collection(db, "activities"), {
+        description: `Generated invoice ${invoiceNumber} for ${job.title}`,
+        userName: auth.currentUser?.displayName || "User",
+        userId: auth.currentUser?.uid,
+        createdAt: serverTimestamp()
+      });
       
       // Send Email with PDF
       if (clientData?.email) {

@@ -30,9 +30,9 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { db, auth, signInWithGoogle, logout, handleFirestoreError, OperationType } from "../firebase";
-import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { AuthContext } from "../App";
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 
 import { 
   Dialog,
@@ -92,6 +92,48 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<"client" | "visit" | "request" | "quote" | "job" | "invoice" | "payment" | null>(null);
+  const [userRole, setUserRole] = useState<"admin" | "team" | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [activities, setActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Fetch or initialize user role
+    const userRef = doc(db, "users", user.uid);
+    const unsubUser = onSnapshot(userRef, async (snap) => {
+      if (snap.exists()) {
+        setUserRole(snap.data().role || "team");
+      } else {
+        // First time login - if it's the owner email, make admin
+        const role = user.email === "apauloprod@gmail.com" ? "admin" : "team";
+        await setDoc(userRef, {
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          role: role,
+          createdAt: serverTimestamp()
+        });
+        setUserRole(role);
+      }
+    });
+
+    // Fetch recent activities
+    const q = query(collection(db, "activities"), orderBy("createdAt", "desc"), limit(10));
+    const unsubActivities = onSnapshot(q, (snap) => {
+      setActivities(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubUser();
+      unsubActivities();
+    };
+  }, [user]);
 
   if (loading) {
     return (
@@ -123,18 +165,28 @@ export default function Dashboard() {
     );
   }
 
-  const menuItems = [
-    { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
-    { icon: Calendar, label: "Schedule", to: "/dashboard/schedule" },
-    { icon: Users, label: "Clients", to: "/dashboard/clients" },
-    { icon: FileText, label: "Requests", to: "/dashboard/requests" },
-    { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
-    { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
-    { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" },
-    { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
-    { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
-    { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
-  ];
+  const menuItems = useMemo(() => {
+    const baseItems = [
+      { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
+      { icon: Calendar, label: "Schedule", to: "/dashboard/schedule" },
+      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" },
+      { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
+    ];
+
+    if (userRole === "admin") {
+      return [
+        ...baseItems,
+        { icon: Users, label: "Clients", to: "/dashboard/clients" },
+        { icon: FileText, label: "Requests", to: "/dashboard/requests" },
+        { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
+        { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
+        { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
+        { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
+      ];
+    }
+
+    return baseItems;
+  }, [userRole]);
 
   const Sidebar = () => (
     <div className="flex flex-col h-full bg-black border-r border-white/5 w-64">
@@ -401,7 +453,9 @@ export default function Dashboard() {
             <Separator orientation="vertical" className="h-6 bg-white/5" />
             <div className="flex items-center gap-2 px-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">08:45 AM</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
           </div>
         </header>
@@ -432,17 +486,23 @@ export default function Dashboard() {
           <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">View All</Button>
         </div>
         <div className="space-y-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex gap-4">
-              <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+          {activities.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">No recent activity</p>
+          ) : (
+            activities.map((activity) => (
+              <div key={activity.id} className="flex gap-4">
+                <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{activity.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {activity.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • by {activity.userName}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-white">Job #1204 marked complete</p>
-                <p className="text-xs text-muted-foreground mt-1">2 hours ago • by John Doe</p>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>

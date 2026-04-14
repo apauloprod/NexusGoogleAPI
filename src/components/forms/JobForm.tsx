@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
-import { db, handleFirestoreError, OperationType } from "../../firebase";
+import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
 
@@ -37,6 +38,7 @@ const jobSchema = z.object({
   notes: z.string().optional(),
   scheduledAt: z.string().optional(),
   duration: z.string().optional(),
+  assignedTeam: z.array(z.string()).optional(),
 });
 
 type JobFormValues = z.infer<typeof jobSchema>;
@@ -51,6 +53,14 @@ import { SchedulePicker } from "../SchedulePicker";
 
 export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableTeam, setAvailableTeam] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, "users"));
+    getDocs(q).then(snap => {
+      setAvailableTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, []);
 
   const form = useForm({
     resolver: zodResolver(jobSchema),
@@ -64,6 +74,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
         : "",
       duration: initialData?.duration || "1h",
+      assignedTeam: initialData?.assignedTeam || [],
     },
   });
 
@@ -92,12 +103,28 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       if (initialData?.id) {
         const jobRef = doc(db, "jobs", initialData.id);
         await updateDoc(jobRef, jobData);
+        
+        // Log activity
+        await addDoc(collection(db, "activities"), {
+          description: `Updated job: ${values.title}`,
+          userName: auth.currentUser?.displayName || "User",
+          userId: auth.currentUser?.uid,
+          createdAt: serverTimestamp()
+        });
       } else {
         await addDoc(collection(db, "jobs"), {
           ...jobData,
           notesCount: values.notes ? 1 : 0,
           photosCount: 0,
           createdAt: serverTimestamp(),
+        });
+
+        // Log activity
+        await addDoc(collection(db, "activities"), {
+          description: `Created new job: ${values.title}`,
+          userName: auth.currentUser?.displayName || "User",
+          userId: auth.currentUser?.uid,
+          createdAt: serverTimestamp()
         });
 
         // Update client status to active
@@ -304,6 +331,38 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             </FormItem>
           )}
         />
+
+        <div className="space-y-3">
+          <FormLabel>Assign Team Members</FormLabel>
+          <div className="grid grid-cols-2 gap-2">
+            {availableTeam.map((member) => (
+              <Button
+                key={member.id}
+                type="button"
+                variant="outline"
+                className={cn(
+                  "justify-start gap-2 h-10 border-white/10",
+                  form.watch("assignedTeam")?.includes(member.id) 
+                    ? "bg-blue-500/20 border-blue-500/50 text-blue-400" 
+                    : "bg-white/5 hover:bg-white/10"
+                )}
+                onClick={() => {
+                  const current = form.getValues("assignedTeam") || [];
+                  if (current.includes(member.id)) {
+                    form.setValue("assignedTeam", current.filter(id => id !== member.id));
+                  } else {
+                    form.setValue("assignedTeam", [...current, member.id]);
+                  }
+                }}
+              >
+                <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                  {member.photoURL ? <img src={member.photoURL} className="h-full w-full object-cover" /> : <Plus className="h-3 w-3" />}
+                </div>
+                <span className="text-xs truncate">{member.displayName || member.email}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
