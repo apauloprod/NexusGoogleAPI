@@ -61,6 +61,7 @@ import Messages from "./dashboard/Messages";
 import SettingsPage from "./dashboard/Settings";
 import Timesheets from "./dashboard/Timesheets";
 import Marketing from "./dashboard/Marketing";
+import Overview from "./dashboard/Overview";
 
 interface SidebarItemProps {
   icon: any;
@@ -408,26 +409,7 @@ export default function Dashboard() {
         {/* Content Area */}
         <main className="flex-1 overflow-auto bg-[#050505]">
           <Routes>
-            <Route path="/" element={<div className="p-8">
-              <h1 className="text-3xl font-bold tracking-tighter mb-8">Welcome back, Owner</h1>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  { label: "Pending Requests", value: "12", icon: MessageSquare },
-                  { label: "Active Jobs", value: "24", icon: CheckSquare },
-                  { label: "Unpaid Invoices", value: "8", icon: FileText },
-                  { label: "Revenue (MTD)", value: "$12,450", icon: CreditCard },
-                ].map((stat, i) => (
-                  <div key={i} className="p-6 rounded-2xl glass border-white/5">
-                    <div className="flex items-center justify-between mb-4">
-                      <stat.icon className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-xs font-bold text-primary">+12%</span>
-                    </div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">{stat.label}</p>
-                    <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>} />
+            <Route path="/" element={<Overview />} />
             <Route path="/requests" element={<Requests />} />
             <Route path="/quotes" element={<Quotes />} />
             <Route path="/schedule" element={<Schedule />} />
