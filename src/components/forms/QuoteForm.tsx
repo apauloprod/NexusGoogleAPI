@@ -21,8 +21,10 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
+
+import { ClientSearchSelect } from "../ClientSearchSelect";
 
 const quoteSchema = z.object({
   clientId: z.string().min(1, "Please select a client"),
@@ -48,20 +50,6 @@ interface QuoteFormProps {
 
 export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [clients, setClients] = useState<any[]>([]);
-
-  useEffect(() => {
-    async function fetchClients() {
-      try {
-        const q = query(collection(db, "clients"), orderBy("name", "asc"));
-        const snapshot = await getDocs(q);
-        setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error fetching clients:", error);
-      }
-    }
-    fetchClients();
-  }, []);
 
   const form = useForm({
     resolver: zodResolver(quoteSchema),
@@ -87,12 +75,13 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
   async function onSubmit(values: QuoteFormValues) {
     setIsSubmitting(true);
     try {
-      const selectedClient = clients.find(c => c.id === values.clientId);
+      const clientDoc = await getDoc(doc(db, "clients", values.clientId));
+      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
       let quoteId = initialData?.id;
       
       const quoteData = {
         ...values,
-        clientName: selectedClient?.name || "Unknown Client",
+        clientName,
         total,
         updatedAt: serverTimestamp(),
       };
@@ -116,7 +105,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         // In a real app, we might check if a visit already exists for this quote
         await addDoc(collection(db, "visits"), {
           clientId: values.clientId,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           title: `Quote ${values.quoteNumber} Visit`,
           date: values.scheduledDate,
           time: values.scheduledTime,
@@ -146,20 +135,13 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Client</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent className="bg-black border-white/10">
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ClientSearchSelect 
+                    value={field.value} 
+                    onValueChange={field.onChange} 
+                    placeholder="Search for a client..."
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

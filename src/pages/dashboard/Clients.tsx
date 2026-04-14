@@ -48,6 +48,19 @@ const Clients = () => {
     client.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] uppercase">Active</Badge>;
+      case 'returning':
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[10px] uppercase">Returning</Badge>;
+      case 'potential':
+        return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] uppercase">Potential</Badge>;
+      default:
+        return <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase">New</Badge>;
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -152,9 +165,7 @@ const Clients = () => {
                   <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase">
                     {client.jobsCount || 0} Jobs
                   </Badge>
-                  <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase">
-                    Active
-                  </Badge>
+                  {getStatusBadge(client.status)}
                 </div>
                 <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white">
                   View Details

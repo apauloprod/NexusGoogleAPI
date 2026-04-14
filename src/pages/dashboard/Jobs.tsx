@@ -65,6 +65,13 @@ const Jobs = () => {
         status: "completed",
         updatedAt: serverTimestamp(),
       });
+
+      // Update client status to returning
+      const clientRef = doc(db, "clients", job.clientId);
+      await updateDoc(clientRef, {
+        status: "returning",
+        updatedAt: serverTimestamp(),
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "invoices");
     }

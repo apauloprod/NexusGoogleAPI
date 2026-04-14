@@ -21,8 +21,10 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
+
+import { ClientSearchSelect } from "../ClientSearchSelect";
 
 const invoiceSchema = z.object({
   clientId: z.string().min(1, "Please select a client"),
@@ -46,20 +48,6 @@ interface InvoiceFormProps {
 
 export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [clients, setClients] = useState<any[]>([]);
-
-  useEffect(() => {
-    async function fetchClients() {
-      try {
-        const q = query(collection(db, "clients"), orderBy("name", "asc"));
-        const snapshot = await getDocs(q);
-        setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error fetching clients:", error);
-      }
-    }
-    fetchClients();
-  }, []);
 
   const form = useForm({
     resolver: zodResolver(invoiceSchema),
@@ -88,19 +76,21 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
   async function onSubmit(values: InvoiceFormValues) {
     setIsSubmitting(true);
     try {
-      const selectedClient = clients.find(c => c.id === values.clientId);
+      const clientDoc = await getDoc(doc(db, "clients", values.clientId));
+      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
+
       if (initialData?.id) {
         const invoiceRef = doc(db, "invoices", initialData.id);
         await updateDoc(invoiceRef, {
           ...values,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           dueDate: new Date(values.dueDate),
           updatedAt: serverTimestamp(),
         });
       } else {
         await addDoc(collection(db, "invoices"), {
           ...values,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           status: "sent",
           paidAmount: 0,
           dueDate: new Date(values.dueDate),
@@ -126,20 +116,13 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Client</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent className="bg-black border-white/10">
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ClientSearchSelect 
+                    value={field.value} 
+                    onValueChange={field.onChange} 
+                    placeholder="Search for a client..."
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

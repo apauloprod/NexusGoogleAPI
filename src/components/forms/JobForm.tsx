@@ -21,8 +21,10 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
+
+import { ClientSearchSelect } from "../ClientSearchSelect";
 
 const jobSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters"),
@@ -45,20 +47,6 @@ interface JobFormProps {
 
 export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [clients, setClients] = useState<any[]>([]);
-
-  useEffect(() => {
-    async function fetchClients() {
-      try {
-        const q = query(collection(db, "clients"), orderBy("name", "asc"));
-        const snapshot = await getDocs(q);
-        setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error fetching clients:", error);
-      }
-    }
-    fetchClients();
-  }, []);
 
   const form = useForm({
     resolver: zodResolver(jobSchema),
@@ -82,24 +70,32 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   async function onSubmit(values: JobFormValues) {
     setIsSubmitting(true);
     try {
-      const selectedClient = clients.find(c => c.id === values.clientId);
+      const clientDoc = await getDoc(doc(db, "clients", values.clientId));
+      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
       
       if (initialData?.id) {
         const jobRef = doc(db, "jobs", initialData.id);
         await updateDoc(jobRef, {
           ...values,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           total,
           updatedAt: serverTimestamp(),
         });
       } else {
         await addDoc(collection(db, "jobs"), {
           ...values,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           total,
           notesCount: values.notes ? 1 : 0,
           photosCount: 0,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // Update client status to active
+        const clientRef = doc(db, "clients", values.clientId);
+        await updateDoc(clientRef, {
+          status: "active",
           updatedAt: serverTimestamp(),
         });
       }
@@ -136,20 +132,13 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Client</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent className="bg-black border-white/10">
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ClientSearchSelect 
+                    value={field.value} 
+                    onValueChange={field.onChange} 
+                    placeholder="Search for a client..."
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

@@ -64,6 +64,13 @@ const Quotes = () => {
         updatedAt: serverTimestamp(),
       });
 
+      // Update client status to active
+      const clientRef = doc(db, "clients", quote.clientId);
+      await updateDoc(clientRef, {
+        status: "active",
+        updatedAt: serverTimestamp(),
+      });
+
       // Confirm associated visits
       const visitsRef = collection(db, "visits");
       const q = query(visitsRef, where("quoteId", "==", quote.id));

@@ -37,9 +37,26 @@ interface PaymentFormProps {
   onCancel?: () => void;
 }
 
+import { Check, ChevronsUpDown, Search } from "lucide-react"
+import { cn } from "@/lib/utils"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+
 export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     async function fetchInvoices() {
@@ -124,29 +141,67 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
           control={form.control}
           name="invoiceId"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className="flex flex-col">
               <FormLabel>Invoice</FormLabel>
-              <Select onValueChange={(value) => {
-                field.onChange(value);
-                const inv = invoices.find(i => i.id === value);
-                if (inv) {
-                  const balance = (inv.total || 0) - (inv.paidAmount || 0);
-                  form.setValue("amount", balance > 0 ? balance : 0);
-                }
-              }} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger className="bg-white/5 border-white/10">
-                    <SelectValue placeholder="Select an invoice" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="bg-black border-white/10">
-                  {invoices.map((inv) => (
-                    <SelectItem key={inv.id} value={inv.id}>
-                      #{inv.invoiceNumber} - {inv.clientName} (${((inv.total || 0) - (inv.paidAmount || 0)).toLocaleString()} balance)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className={cn(
+                        "w-full justify-between bg-white/5 border-white/10 hover:bg-white/10 text-white font-normal",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      {field.value
+                        ? (() => {
+                            const inv = invoices.find((i) => i.id === field.value);
+                            return inv ? `#${inv.invoiceNumber} - ${inv.clientName}` : "Select invoice";
+                          })()
+                        : "Select invoice"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-black border-white/10">
+                  <Command className="bg-transparent">
+                    <CommandInput placeholder="Search invoice or client..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No invoice found.</CommandEmpty>
+                      <CommandGroup>
+                        {invoices.map((inv) => (
+                          <CommandItem
+                            key={inv.id}
+                            value={`${inv.invoiceNumber} ${inv.clientName}`}
+                            onSelect={() => {
+                              field.onChange(inv.id);
+                              const balance = (inv.total || 0) - (inv.paidAmount || 0);
+                              form.setValue("amount", balance > 0 ? balance : 0);
+                              setOpen(false);
+                            }}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                field.value === inv.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>#{inv.invoiceNumber} - {inv.clientName}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                Balance: ${((inv.total || 0) - (inv.paidAmount || 0)).toLocaleString()}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <FormMessage />
             </FormItem>
           )}

@@ -22,16 +22,25 @@ const clientSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   address: z.string().min(5, "Address must be at least 5 characters"),
+  status: z.enum(["potential", "active", "returning"]),
   notes: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
 
 interface ClientFormProps {
-  initialData?: ClientFormValues & { id: string };
+  initialData?: any;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,6 +53,7 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
       email: "",
       phone: "",
       address: "",
+      status: "potential",
       notes: "",
     },
   });
@@ -134,19 +144,43 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address</FormLabel>
-              <FormControl>
-                <Input placeholder="123 Main St, City, State" {...field} className="bg-white/5 border-white/10" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Address</FormLabel>
+                <FormControl>
+                  <Input placeholder="123 Main St, City, State" {...field} className="bg-white/5 border-white/10" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="bg-white/5 border-white/10">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent className="bg-black border-white/10">
+                    <SelectItem value="potential">Potential</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="returning">Returning</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <FormField
           control={form.control}

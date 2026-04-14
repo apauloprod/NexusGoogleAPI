@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 const visitSchema = z.object({
@@ -39,21 +39,15 @@ interface VisitFormProps {
   onCancel?: () => void;
 }
 
+import { ClientSearchSelect } from "../ClientSearchSelect";
+
 export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [clients, setClients] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetchClients() {
-      try {
-        const q = query(collection(db, "clients"), orderBy("name", "asc"));
-        const snapshot = await getDocs(q);
-        setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (error) {
-        console.error("Error fetching clients:", error);
-      }
-    }
-    fetchClients();
+    // We still need to fetch clients if we want to auto-fill the address
+    // but ClientSearchSelect handles its own fetching.
+    // To auto-fill address, we can listen to clientId changes.
   }, []);
 
   const form = useForm<VisitFormValues>({
@@ -67,22 +61,41 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
     },
   });
 
+  const selectedClientId = form.watch("clientId");
+
+  useEffect(() => {
+    if (selectedClientId) {
+      const fetchClient = async () => {
+        const clientDoc = await getDoc(doc(db, "clients", selectedClientId));
+        if (clientDoc.exists()) {
+          const data = clientDoc.data();
+          if (data.address && !form.getValues("address")) {
+            form.setValue("address", data.address);
+          }
+        }
+      };
+      fetchClient();
+    }
+  }, [selectedClientId, form]);
+
   async function onSubmit(values: VisitFormValues) {
     setIsSubmitting(true);
     try {
-      const selectedClient = clients.find(c => c.id === values.clientId);
+      const clientDoc = await getDoc(doc(db, "clients", values.clientId));
+      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
+
       if (initialData?.id) {
         const visitRef = doc(db, "visits", initialData.id);
         await updateDoc(visitRef, {
           ...values,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           scheduledAt: new Date(values.scheduledAt),
           updatedAt: serverTimestamp(),
         });
       } else {
         await addDoc(collection(db, "visits"), {
           ...values,
-          clientName: selectedClient?.name || "Unknown Client",
+          clientName,
           status: "scheduled",
           scheduledAt: new Date(values.scheduledAt),
           createdAt: serverTimestamp(),
@@ -120,26 +133,13 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Client</FormLabel>
-              <Select onValueChange={(value) => {
-                field.onChange(value);
-                const client = clients.find(c => c.id === value);
-                if (client?.address) {
-                  form.setValue("address", client.address);
-                }
-              }} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger className="bg-white/5 border-white/10">
-                    <SelectValue placeholder="Select a client" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="bg-black border-white/10">
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <ClientSearchSelect 
+                  value={field.value} 
+                  onValueChange={field.onChange} 
+                  placeholder="Search for a client..."
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

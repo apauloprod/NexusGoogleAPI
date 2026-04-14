@@ -57,6 +57,7 @@ const Requests = () => {
         email: request.email,
         phone: request.phone,
         address: request.address,
+        status: "potential", // New clients from requests are potential
         createdAt: serverTimestamp(),
       });
       clientId = newClientRef.id;
