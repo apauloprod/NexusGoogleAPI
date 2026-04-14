@@ -128,7 +128,15 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         const clientData = clientDoc.exists() ? clientDoc.data() : null;
         if (clientData?.email) {
           try {
-            const response = await fetch(`${window.location.origin}/api/send-quote`, {
+            const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+            
+            // Check if we are on a known static host
+            if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
+              console.error("Email feature requires a backend. GitHub Pages is static-only. Please set VITE_API_URL to your backend URL.");
+              return;
+            }
+
+            const response = await fetch(`${apiUrl}/api/send-quote`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
