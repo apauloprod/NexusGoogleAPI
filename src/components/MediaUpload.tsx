@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { storage, db, handleFirestoreError, OperationType } from "../firebase";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore";
 
 interface MediaUploadProps {
@@ -21,7 +21,6 @@ interface MediaUploadProps {
 export const MediaUpload: React.FC<MediaUploadProps> = ({ jobId, onClose }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<{ [key: string]: number }>({});
   const [existingMedia, setExistingMedia] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,46 +50,44 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({ jobId, onClose }) => {
     if (files.length === 0) return;
     setUploading(true);
 
-    const uploadPromises = files.map(async (file) => {
-      const storageRef = ref(storage, `jobs/${jobId}/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      return new Promise((resolve, reject) => {
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setProgress(prev => ({ ...prev, [file.name]: p }));
-          },
-          (error) => reject(error),
-          async () => {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            const mediaItem = {
-              url: downloadURL,
-              name: file.name,
-              type: file.type.startsWith("video") ? "video" : "image",
-              createdAt: new Date().toISOString(),
-              storagePath: storageRef.fullPath
-            };
-            
-            await updateDoc(doc(db, "jobs", jobId), {
-              media: arrayUnion(mediaItem)
-            });
-            
-            setExistingMedia(prev => [...prev, mediaItem]);
-            resolve(mediaItem);
-          }
-        );
-      });
-    });
-
     try {
-      await Promise.all(uploadPromises);
+      for (const file of files) {
+        const storageRef = ref(storage, `jobs/${jobId}/${Date.now()}_${file.name}`);
+        
+        console.log(`Attempting to upload ${file.name} to ${storageRef.fullPath}...`);
+        
+        try {
+          const snapshot = await uploadBytes(storageRef, file);
+          const downloadURL = await getDownloadURL(snapshot.ref);
+          
+          const mediaItem = {
+            url: downloadURL,
+            name: file.name,
+            type: file.type.startsWith("video") ? "video" : "image",
+            createdAt: new Date().toISOString(),
+            storagePath: storageRef.fullPath
+          };
+          
+          await updateDoc(doc(db, "jobs", jobId), {
+            media: arrayUnion(mediaItem)
+          });
+          
+          setExistingMedia(prev => [...prev, mediaItem]);
+        } catch (err: any) {
+          console.error(`Error uploading ${file.name}:`, err);
+          if (err.code === 'storage/unauthorized') {
+            alert(`Upload failed for ${file.name}: Unauthorized. Please check your storage rules.`);
+          } else if (err.message?.includes('CORS')) {
+            alert(`Upload failed for ${file.name}: CORS error. Please ensure your Firebase Storage bucket allows uploads from this domain.`);
+          } else {
+            alert(`Upload failed for ${file.name}: ${err.message || 'Unknown error'}`);
+          }
+          throw err; // Stop the loop if one fails
+        }
+      }
       setFiles([]);
-      setProgress({});
     } catch (error) {
-      console.error("Upload error:", error);
-      alert("Failed to upload some files.");
+      console.error("Batch upload error:", error);
     } finally {
       setUploading(false);
     }
@@ -185,9 +182,6 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({ jobId, onClose }) => {
               <div key={i} className="flex items-center gap-3 text-xs glass p-2 rounded-lg border-white/5">
                 {file.type.startsWith("video") ? <Video className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
                 <span className="flex-1 truncate">{file.name}</span>
-                {progress[file.name] !== undefined && (
-                  <span className="text-muted-foreground">{Math.round(progress[file.name])}%</span>
-                )}
               </div>
             ))}
           </div>
