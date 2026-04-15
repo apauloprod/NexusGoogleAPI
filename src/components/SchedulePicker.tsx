@@ -23,9 +23,10 @@ interface SchedulePickerProps {
   value?: string; // ISO string
   onChange: (value: string) => void;
   placeholder?: string;
+  excludeId?: string;
 }
 
-export function SchedulePicker({ value, onChange, placeholder = "Select date and time" }: SchedulePickerProps) {
+export function SchedulePicker({ value, onChange, placeholder = "Select date and time", excludeId }: SchedulePickerProps) {
   const [date, setDate] = useState<Date | undefined>(() => {
     if (!value) return undefined;
     const d = new Date(value);
@@ -83,23 +84,26 @@ export function SchedulePicker({ value, onChange, placeholder = "Select date and
         getDocs(jobsQuery)
       ]);
 
-      const processDocs = (snapshot: any, defaultTitle: string) => snapshot.docs.map((doc: any) => {
-        const data = doc.data();
-        const startTime = data.scheduledAt.toDate();
-        const durationStr = data.duration || "1h";
-        let durationMinutes = 60;
-        if (durationStr.endsWith("h")) {
-          durationMinutes = parseInt(durationStr) * 60;
-        } else if (durationStr.endsWith("m")) {
-          durationMinutes = parseInt(durationStr);
-        }
-        
-        return {
-          start: startTime,
-          end: addMinutes(startTime, durationMinutes),
-          title: data.title || defaultTitle
-        };
-      });
+      const processDocs = (snapshot: any, defaultTitle: string) => 
+        snapshot.docs
+          .filter((doc: any) => doc.id !== excludeId)
+          .map((doc: any) => {
+            const data = doc.data();
+            const startTime = data.scheduledAt.toDate();
+            const durationStr = data.duration || "1h";
+            let durationMinutes = 60;
+            if (durationStr.endsWith("h")) {
+              durationMinutes = parseInt(durationStr) * 60;
+            } else if (durationStr.endsWith("m")) {
+              durationMinutes = parseInt(durationStr);
+            }
+            
+            return {
+              start: startTime,
+              end: addMinutes(startTime, durationMinutes),
+              title: data.title || defaultTitle
+            };
+          });
 
       const busy = [
         ...processDocs(visitsSnapshot, "Visit"),

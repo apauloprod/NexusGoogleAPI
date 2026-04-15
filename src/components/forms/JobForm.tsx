@@ -172,6 +172,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     value={field.value} 
                     onChange={field.onChange} 
                     placeholder="Select a time slot..."
+                    excludeId={initialData?.id}
                   />
                 </FormControl>
                 <FormMessage />

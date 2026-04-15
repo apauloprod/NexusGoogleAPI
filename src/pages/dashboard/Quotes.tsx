@@ -8,9 +8,15 @@ import {
   CheckCircle2,
   XCircle,
   Send,
-  Briefcase
+  Briefcase,
+  Search,
+  Filter,
+  Download, 
+  Edit2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc } from "firebase/firestore";
@@ -25,7 +31,6 @@ import {
 import { QuoteForm } from "../../components/forms/QuoteForm";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Download, Edit2 } from "lucide-react";
 
 
 
@@ -35,6 +40,8 @@ const Quotes = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<any>(null);
   const [isSending, setIsSending] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
@@ -178,6 +185,18 @@ const Quotes = () => {
     }
   };
 
+  const filteredQuotes = quotes.filter(quote => {
+    const matchesSearch = quote.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          quote.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    const dateA = a.scheduledAt ? a.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
+    const dateB = b.scheduledAt ? b.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
+    if (dateA !== dateB) return dateA - dateB;
+    return (a.clientName || "").localeCompare(b.clientName || "");
+  });
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -206,6 +225,31 @@ const Quotes = () => {
         </Dialog>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by client name or quote number..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-white/5 border-white/10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[180px] bg-white/5 border-white/10">
+            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent className="bg-black border-white/10">
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="sent">Sent</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="declined">Declined</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <Dialog open={!!editingQuote} onOpenChange={(open) => !open && setEditingQuote(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
           <DialogHeader>
@@ -226,10 +270,10 @@ const Quotes = () => {
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading quotes...</div>
-        ) : quotes.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No quotes found.</div>
+        ) : filteredQuotes.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No quotes found matching your criteria.</div>
         ) : (
-          quotes.map((quote) => (
+          filteredQuotes.map((quote) => (
             <div key={quote.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
               <div className="flex items-center gap-6">
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -242,7 +286,10 @@ const Quotes = () => {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">#{quote.quoteNumber || quote.id.slice(0, 6)}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {quote.createdAt?.toDate().toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 
+                      {quote.scheduledAt ? quote.scheduledAt.toDate().toLocaleString() : quote.createdAt?.toDate().toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               </div>

@@ -9,9 +9,13 @@ import {
   AlertCircle,
   Download,
   Edit2,
-  Send
+  Send,
+  Search,
+  Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, getDoc, doc } from "firebase/firestore";
@@ -33,6 +37,8 @@ const Invoices = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [isSending, setIsSending] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
@@ -132,6 +138,18 @@ const Invoices = () => {
     }
   };
 
+  const filteredInvoices = invoices.filter(inv => {
+    const matchesSearch = inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          inv.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || inv.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    const dateA = a.dueDate ? a.dueDate.toDate().getTime() : 0;
+    const dateB = b.dueDate ? b.dueDate.toDate().getTime() : 0;
+    if (dateA !== dateB) return dateB - dateA; // Descending by due date
+    return (a.clientName || "").localeCompare(b.clientName || "");
+  });
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -160,6 +178,31 @@ const Invoices = () => {
         </Dialog>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by client name or invoice number..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-white/5 border-white/10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[180px] bg-white/5 border-white/10">
+            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent className="bg-black border-white/10">
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="sent">Sent</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <Dialog open={!!editingInvoice} onOpenChange={(open) => !open && setEditingInvoice(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
           <DialogHeader>
@@ -183,10 +226,10 @@ const Invoices = () => {
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading invoices...</div>
-        ) : invoices.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No invoices found.</div>
+        ) : filteredInvoices.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No invoices found matching your criteria.</div>
         ) : (
-          invoices.map((inv) => (
+          filteredInvoices.map((inv) => (
             <div key={inv.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
               <div className="flex items-center gap-6">
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">

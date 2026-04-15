@@ -8,9 +8,13 @@ import {
   MessageSquare,
   ImageIcon,
   MoreVertical,
-  FileText
+  FileText,
+  Search,
+  Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
@@ -35,6 +39,8 @@ const Jobs = () => {
   const [editingJob, setEditingJob] = useState<any>(null);
   const [viewingMediaJob, setViewingMediaJob] = useState<any>(null);
   const [isConverting, setIsConverting] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
@@ -141,6 +147,19 @@ const Jobs = () => {
     }
   };
 
+  const filteredJobs = jobs.filter(job => {
+    const matchesSearch = job.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          job.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          job.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || job.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    const dateA = a.scheduledAt ? a.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
+    const dateB = b.scheduledAt ? b.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
+    if (dateA !== dateB) return dateA - dateB;
+    return (a.clientName || "").localeCompare(b.clientName || "");
+  });
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -167,6 +186,31 @@ const Jobs = () => {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by title, client, or quote number..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-white/5 border-white/10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[180px] bg-white/5 border-white/10">
+            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent className="bg-black border-white/10">
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="on-hold">On Hold</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Dialog open={!!editingJob} onOpenChange={(open) => !open && setEditingJob(null)}>
@@ -205,10 +249,10 @@ const Jobs = () => {
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading jobs...</div>
-        ) : jobs.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No active jobs found.</div>
+        ) : filteredJobs.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No jobs found matching your criteria.</div>
         ) : (
-          jobs.map((job) => (
+          filteredJobs.map((job) => (
             <div key={job.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
               <div className="flex items-center gap-6">
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -221,8 +265,16 @@ const Jobs = () => {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" /> {job.clientName}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Last updated {job.updatedAt?.toDate().toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> 
+                      {job.scheduledAt ? job.scheduledAt.toDate().toLocaleString() : "Unscheduled"}
+                    </span>
                   </div>
+                  {job.quoteNumber && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Quote: {job.quoteNumber}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-6">
