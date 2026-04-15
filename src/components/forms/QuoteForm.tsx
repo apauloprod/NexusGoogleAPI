@@ -49,10 +49,11 @@ interface QuoteFormProps {
 
 import { SchedulePicker } from "../SchedulePicker";
 
-import { getApiUrl } from "../../lib/api-utils";
+
 
 export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const form = useForm({
     resolver: zodResolver(quoteSchema),
@@ -93,8 +94,6 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     }
   }, [initialData, form]);
 
-  const [emailError, setEmailError] = useState<string | null>(null);
-
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
@@ -133,17 +132,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       const clientData = clientDoc.exists() ? clientDoc.data() : null;
       if (clientData?.email) {
         try {
-          const apiUrl = getApiUrl();
-          
-          if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
-            const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
-            console.error(msg);
-            setEmailError(msg);
-            setIsSubmitting(false);
-            return;
-          }
-
-          const response = await fetch(`${apiUrl}/api/send-quote`, {
+          const response = await fetch(`/api/send-quote`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

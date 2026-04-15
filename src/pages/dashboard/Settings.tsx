@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 
-import { getApiUrl } from "../../lib/api-utils";
+
 
 const Settings = () => {
   const [isSeeding, setIsSeeding] = useState(false);
@@ -341,8 +341,7 @@ const Settings = () => {
                       className="rounded-xl border-white/10 hover:bg-white/5"
                       onClick={async () => {
                         try {
-                          const apiUrl = getApiUrl();
-                          const res = await fetch(`${apiUrl}/api/health`);
+                          const res = await fetch(`/api/health`);
                           const data = await res.json();
                           alert(`API Status: ${data.status}\nEnvironment: ${data.env}`);
                         } catch (err) {
@@ -357,8 +356,7 @@ const Settings = () => {
                       className="rounded-xl border-white/10 hover:bg-white/5"
                       onClick={async () => {
                         try {
-                          const apiUrl = getApiUrl();
-                          const res = await fetch(`${apiUrl}/api/send-quote`);
+                          const res = await fetch(`/api/send-quote`);
                           const data = await res.json();
                           alert(`API Route Check: ${data.message}`);
                         } catch (err) {

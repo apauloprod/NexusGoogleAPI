@@ -57,8 +57,7 @@ const Invoices = () => {
         return;
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
-      const response = await fetch(`${apiUrl}/api/send-invoice`, {
+      const response = await fetch(`/api/send-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

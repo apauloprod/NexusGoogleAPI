@@ -27,7 +27,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Download, Edit2 } from "lucide-react";
 
-import { getApiUrl } from "../../lib/api-utils";
+
 
 const Quotes = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
@@ -59,8 +59,7 @@ const Quotes = () => {
         return;
       }
 
-      const apiUrl = getApiUrl();
-      const response = await fetch(`${apiUrl}/api/send-quote`, {
+      const response = await fetch(`/api/send-quote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

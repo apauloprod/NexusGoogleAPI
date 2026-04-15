@@ -46,7 +46,7 @@ interface InvoiceFormProps {
   onCancel?: () => void;
 }
 
-import { getApiUrl } from "../../lib/api-utils";
+
 
 export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -142,16 +142,7 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
       // Send Email with PDF (for both new and updated invoices)
       if (clientData?.email) {
         try {
-          const apiUrl = getApiUrl();
-          
-          if (window.location.hostname.includes("github.io") && !import.meta.env.VITE_API_URL) {
-            const msg = "Email feature requires a backend. GitHub Pages is static-only. Please use the .run.app URL provided in AI Studio.";
-            setEmailError(msg);
-            setIsSubmitting(false);
-            return;
-          }
-
-          const response = await fetch(`${apiUrl}/api/send-invoice`, {
+          const response = await fetch(`/api/send-invoice`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
