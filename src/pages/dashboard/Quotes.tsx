@@ -34,6 +34,7 @@ const Quotes = () => {
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<any>(null);
+  const [isSending, setIsSending] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
@@ -46,8 +47,6 @@ const Quotes = () => {
     });
     return () => unsubscribe();
   }, []);
-
-  const [isSending, setIsSending] = useState<string | null>(null);
 
   const sendQuoteEmail = async (quote: any) => {
     setIsSending(quote.id);

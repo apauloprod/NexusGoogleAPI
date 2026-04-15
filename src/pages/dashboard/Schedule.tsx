@@ -6,7 +6,9 @@ import {
   MapPin,
   User as UserIcon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  LayoutList,
+  CalendarDays
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,8 @@ const Schedule = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -68,8 +72,6 @@ const Schedule = () => {
     };
   }, []);
 
-  const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
-
   const updateSchedule = (data: any[], type: 'visits' | 'jobs') => {
     setScheduleData(prev => {
       const newData = { ...prev, [type]: data };
@@ -82,6 +84,14 @@ const Schedule = () => {
     });
   };
 
+  const groupedVisits = visits.reduce((acc, item) => {
+    if (!item.scheduledAt) return acc;
+    const dateStr = item.scheduledAt.toDate().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    if (!acc[dateStr]) acc[dateStr] = [];
+    acc[dateStr].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -90,6 +100,26 @@ const Schedule = () => {
           <p className="text-muted-foreground">View and manage your team's daily schedule and visits.</p>
         </div>
         <div className="flex items-center gap-4">
+          <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn("rounded-lg px-3", viewMode === 'list' && "bg-white/10")}
+              onClick={() => setViewMode('list')}
+            >
+              <LayoutList className="h-4 w-4 mr-2" />
+              List
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn("rounded-lg px-3", viewMode === 'calendar' && "bg-white/10")}
+              onClick={() => setViewMode('calendar')}
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Calendar
+            </Button>
+          </div>
           <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1">
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
               <ChevronLeft className="h-4 w-4" />
@@ -156,6 +186,49 @@ const Schedule = () => {
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading schedule...</div>
         ) : visits.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No items scheduled for this period.</div>
+        ) : viewMode === 'calendar' ? (
+          <div className="space-y-8">
+            {Object.entries(groupedVisits).map(([dateStr, items]) => (
+              <div key={dateStr} className="space-y-4">
+                <h2 className="text-xl font-bold border-b border-white/10 pb-2 text-emerald-400">{dateStr}</h2>
+                <div className="grid gap-4">
+                  {(items as any[]).map((item) => (
+                    <div key={item.id} className="p-4 rounded-2xl glass border-white/5 flex items-center gap-4 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-bold text-lg">{item.title}</h3>
+                          <Badge variant="outline" className={cn(
+                            "text-[10px] uppercase tracking-wider",
+                            item.type === 'job' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-white/5 border-white/10",
+                            item.status === 'confirmed' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                          )}>
+                            {item.type === 'job' ? 'Job' : 'Visit'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{item.notes || "No notes provided."}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {item.scheduledAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="flex items-center gap-1.5"><UserIcon className="h-3 w-3" /> {item.clientName}</span>
+                          {item.address && <span className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {item.address}</span>}
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setItemToDelete(item);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           visits.map((item) => (
             <div key={item.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
