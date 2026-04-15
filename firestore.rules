@@ -82,6 +82,9 @@ service cloud.firestore {
     match /visits/{visitId} {
       allow read, write: if isStaff();
     }
+    match /activities/{activityId} {
+      allow read, write: if isStaff();
+    }
 
     // Users: Admin can manage, users can read their own
     match /users/{userId} {

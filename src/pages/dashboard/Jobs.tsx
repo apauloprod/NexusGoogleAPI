@@ -34,6 +34,7 @@ const Jobs = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
   const [viewingMediaJob, setViewingMediaJob] = useState<any>(null);
+  const [isConverting, setIsConverting] = useState<string | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
@@ -48,6 +49,7 @@ const Jobs = () => {
   }, []);
 
   const convertToInvoice = async (job: any) => {
+    setIsConverting(job.id);
     try {
       let invoiceNumber = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
       if (job.quoteNumber) {
@@ -121,6 +123,8 @@ const Jobs = () => {
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "invoices");
+    } finally {
+      setIsConverting(null);
     }
   };
 
@@ -238,9 +242,10 @@ const Jobs = () => {
                       size="sm" 
                       className="text-xs gap-1 hover:text-emerald-500"
                       onClick={() => convertToInvoice(job)}
+                      disabled={isConverting === job.id}
                     >
                       <FileText className="h-3 w-3" />
-                      Invoice
+                      {isConverting === job.id ? "Processing..." : "Invoice & Complete Job"}
                     </Button>
                   )}
                   <Button 
