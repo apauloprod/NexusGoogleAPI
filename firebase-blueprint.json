@@ -92,6 +92,38 @@
         "notes": { "type": "string" }
       },
       "required": ["name", "email"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Business expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["description", "amount", "date"]
+    },
+    "Timesheet": {
+      "title": "Timesheet",
+      "description": "Employee time tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "jobId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number" },
+        "rate": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed"] }
+      },
+      "required": ["userId", "startTime", "status"]
     }
   },
   "firestore": {
@@ -99,6 +131,8 @@
     "/quotes/{quoteId}": { "schema": "Quote", "description": "Finalized quotes" },
     "/jobs/{jobId}": { "schema": "Job", "description": "Scheduled jobs" },
     "/invoices/{invoiceId}": { "schema": "Invoice", "description": "Invoices" },
-    "/clients/{clientId}": { "schema": "Client", "description": "Customer records" }
+    "/clients/{clientId}": { "schema": "Client", "description": "Customer records" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Business expenses" },
+    "/timesheets/{timesheetId}": { "schema": "Timesheet", "description": "Employee timesheets" }
   }
 }

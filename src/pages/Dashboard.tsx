@@ -6,6 +6,7 @@ import {
   FileText, 
   Calendar, 
   CreditCard, 
+  DollarSign,
   Settings, 
   Plus, 
   Search, 
@@ -62,6 +63,7 @@ import SettingsPage from "./dashboard/Settings";
 import Timesheets from "./dashboard/Timesheets";
 import Marketing from "./dashboard/Marketing";
 import Overview from "./dashboard/Overview";
+import Expenses from "./dashboard/Expenses";
 
 interface SidebarItemProps {
   icon: any;
@@ -378,6 +380,7 @@ export default function Dashboard() {
         { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
         { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
         { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
+        { icon: DollarSign, label: "Expenses", to: "/dashboard/expenses" },
         { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
       ];
     }
@@ -502,6 +505,7 @@ export default function Dashboard() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/timesheets" element={<Timesheets />} />
             <Route path="/marketing" element={<Marketing />} />
+            <Route path="/expenses" element={<Expenses />} />
           </Routes>
         </main>
       </div>
