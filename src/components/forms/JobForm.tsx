@@ -22,7 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, CheckCircle2, User as UserIcon, Search } from "lucide-react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, onSnapshot } from "firebase/firestore";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -56,11 +56,16 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableTeam, setAvailableTeam] = useState<any[]>([]);
   const [teamSearch, setTeamSearch] = useState("");
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
 
   useEffect(() => {
     const q = query(collection(db, "users"));
     getDocs(q).then(snap => {
       setAvailableTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    onSnapshot(collection(db, "customTasks"), (snap) => {
+      setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
@@ -256,15 +261,32 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <FormLabel>Services / Items</FormLabel>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              className="h-8 border-white/10 hover:bg-white/5"
-              onClick={() => append({ description: "", price: 0 })}
-            >
-              <Plus className="h-3 w-3 mr-1" /> Add Service
-            </Button>
+            <div className="flex gap-2">
+              {customTasks.length > 0 && (
+                <Select onValueChange={(val) => {
+                  const task = customTasks.find(t => t.id === val);
+                  if (task) append({ description: task.name, price: task.defaultPrice });
+                }}>
+                  <SelectTrigger className="h-8 w-[150px] bg-white/5 border-white/10 text-[10px] uppercase font-bold">
+                    <SelectValue placeholder="Quick Add" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-black border-white/10">
+                    {customTasks.map(task => (
+                      <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                className="h-8 border-white/10 hover:bg-white/5"
+                onClick={() => append({ description: "", price: 0 })}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Service
+              </Button>
+            </div>
           </div>
           
           <div className="space-y-2">

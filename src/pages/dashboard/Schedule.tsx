@@ -8,12 +8,14 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutList,
-  CalendarDays
+  CalendarDays,
+  History,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, where, doc, deleteDoc } from "firebase/firestore";
+import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
+import { collection, onSnapshot, query, orderBy, where, doc, deleteDoc, limit } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -25,17 +27,23 @@ import {
 import { VisitForm } from "../../components/forms/VisitForm";
 import { JobForm } from "../../components/forms/JobForm";
 import { cn } from "@/lib/utils";
-import { Trash2 } from "lucide-react";
+import { AuthContext } from "../../App";
+import { useContext } from "react";
+
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, subDays } from "date-fns";
 
 const Schedule = () => {
+  const { user, impersonatedUser } = useContext(AuthContext);
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'timeline'>('calendar');
   const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
+  const [currentUserData, setCurrentUserData] = useState<any>(null);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -49,6 +57,20 @@ const Schedule = () => {
   };
 
   useEffect(() => {
+    if (!user) return;
+    const targetUid = impersonatedUser?.uid || user.uid;
+
+    // Fetch user and business settings
+    const unsubUser = onSnapshot(doc(db, "users", targetUid), (snap) => {
+      setCurrentUserData(snap.data());
+    });
+
+    const unsubSettings = onSnapshot(query(collection(db, "users"), where("role", "==", "admin"), limit(1)), (snap) => {
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      }
+    });
+
     const visitsQuery = query(collection(db, "visits"), orderBy("scheduledAt", "asc"));
     const jobsQuery = query(collection(db, "jobs"), where("status", "==", "active"), orderBy("scheduledAt", "asc"));
 
@@ -67,6 +89,8 @@ const Schedule = () => {
     });
 
     return () => {
+      unsubUser();
+      unsubSettings();
       unsubscribeVisits();
       unsubscribeJobs();
     };
@@ -95,7 +119,26 @@ const Schedule = () => {
   const filteredVisits = visits.filter(item => {
     if (!item.scheduledAt) return false;
     const date = item.scheduledAt.toDate();
-    return date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear();
+    const isSameMonthYear = date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear();
+    
+    // Privacy Logic:
+    const role = currentUserData?.role || 'staff';
+    const visibility = businessSettings?.jobVisibility || 'all';
+    const currentUserId = impersonatedUser?.uid || user?.uid;
+
+    if (role !== 'admin' && visibility === 'own') {
+      if (item.type === 'job') {
+        return isSameMonthYear && (item.assignedTeam || []).includes(currentUserId);
+      }
+      return isSameMonthYear; 
+    }
+
+    return isSameMonthYear;
+  });
+
+  const daysInMonth = eachDayOfInterval({
+    start: startOfMonth(currentDate),
+    end: endOfMonth(currentDate)
   });
 
   const groupedVisits = filteredVisits.reduce((acc, item) => {
@@ -132,6 +175,15 @@ const Schedule = () => {
             >
               <CalendarDays className="h-4 w-4 mr-2" />
               Calendar
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className={cn("rounded-lg px-3", viewMode === 'timeline' && "bg-white/10")}
+              onClick={() => setViewMode('timeline')}
+            >
+              <History className="h-4 w-4 mr-2" />
+              Timeline
             </Button>
           </div>
           <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1">
@@ -242,6 +294,86 @@ const Schedule = () => {
                 </div>
               </div>
             ))}
+          </div>
+        ) : viewMode === 'timeline' ? (
+          <div className="overflow-x-auto pb-6 -mx-8 px-8 no-scrollbar">
+            <div className="flex gap-4 min-w-max">
+              {daysInMonth.map(day => {
+                const dayItems = filteredVisits.filter(v => isSameDay(v.scheduledAt.toDate(), day));
+                return (
+                  <div key={day.toISOString()} className="w-72 flex-shrink-0 space-y-4">
+                    <div className={cn(
+                      "p-4 rounded-3xl text-center border transition-all cursor-default",
+                      isSameDay(day, new Date()) 
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]" 
+                        : "bg-white/5 border-white/5 text-muted-foreground hover:border-white/10"
+                    )}>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1">{format(day, 'EEEE')}</p>
+                      <p className="text-3xl font-black tracking-tighter">{format(day, 'd')}</p>
+                      <p className="text-[10px] uppercase font-bold mt-1 opacity-50 tracking-widest">{format(day, 'MMMM')}</p>
+                    </div>
+                    
+                    <div className="space-y-3 min-h-[500px]">
+                      {dayItems.length === 0 ? (
+                        <div className="h-32 border border-dashed border-white/5 rounded-[2rem] flex flex-col items-center justify-center opacity-20">
+                           <CalendarIcon className="h-5 w-5 mb-2" />
+                           <span className="text-[10px] font-bold uppercase tracking-widest">Free Day</span>
+                        </div>
+                      ) : (
+                        dayItems.map(item => (
+                          <div 
+                            key={item.id} 
+                            onClick={() => setEditingItem(item)}
+                            className={cn(
+                              "p-5 rounded-[2rem] border transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] group relative glass",
+                              item.type === 'job' 
+                                ? "hover:border-blue-400/40" 
+                                : "hover:border-white/20"
+                            )}
+                          >
+                            <div className={cn(
+                              "absolute top-4 right-4 h-2 w-2 rounded-full",
+                              item.type === 'job' ? "bg-blue-500" : "bg-muted-foreground/30"
+                            )} />
+                            
+                            <h4 className="font-bold text-sm mb-3 group-hover:text-white transition-colors line-clamp-2 pr-4">{item.title}</h4>
+                            
+                            <div className="space-y-2">
+                              <p className="text-[10px] text-muted-foreground flex items-center gap-2 font-medium">
+                                <Clock className="h-3 w-3" />
+                                {format(item.scheduledAt.toDate(), 'h:mm a')}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground flex items-center gap-2 font-medium">
+                                <UserIcon className="h-3 w-3" />
+                                <span className="truncate">{item.clientName}</span>
+                              </p>
+                              
+                              {item.type === 'job' && item.assignedTeam?.length > 0 && (
+                                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/5">
+                                  <div className="flex -space-x-2">
+                                    {item.assignedTeam.slice(0, 3).map((tmId: string) => (
+                                      <div key={tmId} className="h-6 w-6 rounded-full border-2 border-[#0a0a0a] bg-white/10 flex items-center justify-center text-[8px] font-black uppercase ring-1 ring-white/10">
+                                        {tmId.substring(0, 2)}
+                                      </div>
+                                    ))}
+                                    {item.assignedTeam.length > 3 && (
+                                      <div className="h-6 w-6 rounded-full border-2 border-[#0a0a0a] bg-white/20 flex items-center justify-center text-[8px] font-black ring-1 ring-white/10">
+                                        +{item.assignedTeam.length - 3}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Team</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
           filteredVisits.map((item) => (

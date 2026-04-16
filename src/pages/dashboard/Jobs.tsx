@@ -16,8 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { AuthContext } from "../../App";
+import { useContext } from "react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -33,6 +35,7 @@ import { cn } from "@/lib/utils";
 
 
 const Jobs = () => {
+  const { user, impersonatedUser } = useContext(AuthContext);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -41,8 +44,24 @@ const Jobs = () => {
   const [isConverting, setIsConverting] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentUserData, setCurrentUserData] = useState<any>(null);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   useEffect(() => {
+    if (!user) return;
+    const targetUid = impersonatedUser?.uid || user.uid;
+
+    // Fetch user and business settings
+    const unsubUser = onSnapshot(doc(db, "users", targetUid), (snap) => {
+      setCurrentUserData(snap.data());
+    });
+
+    const unsubSettings = onSnapshot(query(collection(db, "users"), where("role", "==", "admin"), limit(1)), (snap) => {
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      }
+    });
+
     const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -51,7 +70,11 @@ const Jobs = () => {
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "jobs");
     });
-    return () => unsubscribe();
+    return () => {
+      unsubUser();
+      unsubSettings();
+      unsubscribe();
+    };
   }, []);
 
   const convertToInvoice = async (job: any) => {
@@ -152,7 +175,19 @@ const Jobs = () => {
                           job.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           job.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || job.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    if (!matchesSearch || !matchesStatus) return false;
+
+    // Privacy Logic:
+    const role = impersonatedUser?.role || currentUserData?.role || 'staff';
+    const visibility = businessSettings?.jobVisibility || 'all';
+    const currentUserId = impersonatedUser?.uid || user?.uid;
+
+    if (role !== 'admin' && visibility === 'own') {
+      return (job.assignedTeam || []).includes(currentUserId);
+    }
+
+    return true;
   }).sort((a, b) => {
     const dateA = a.scheduledAt ? a.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
     const dateB = b.scheduledAt ? b.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;

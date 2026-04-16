@@ -49,7 +49,7 @@ import { AuthContext } from "../../App";
 import { format, differenceInMinutes } from "date-fns";
 
 const Timesheets = () => {
-  const { user } = useContext(AuthContext);
+  const { user, impersonatedUser } = useContext(AuthContext);
   const [entries, setEntries] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [activeEntry, setActiveEntry] = useState<any>(null);
@@ -67,15 +67,17 @@ const Timesheets = () => {
 
   useEffect(() => {
     if (!user) return;
+    const targetUid = impersonatedUser?.uid || user.uid;
 
     // Get user role and hourly rate
-    const unsubUser = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    const unsubUser = onSnapshot(doc(db, "users", targetUid), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        setUserRole(data.role);
+        const role = impersonatedUser?.role || data.role;
+        setUserRole(role);
         setHourlyRate(data.hourlyRate || 0);
         
-        if (data.role === 'admin') {
+        if (role === 'admin') {
           // Fetch all team members for assignment
           const qTeam = query(collection(db, "users"));
           onSnapshot(qTeam, (teamSnap) => {
@@ -86,21 +88,15 @@ const Timesheets = () => {
     });
 
     // Get timesheets
-    let q = query(collection(db, "timesheets"), orderBy("startTime", "desc"));
-    
-    // If not admin, only see own timesheets
-    // Note: We'll handle filtering in the rules, but also in the query for better UX
-    // However, if we want admin to see ALL, we need to check role first.
-    // Since we don't know role immediately, we'll subscribe to all if admin, or filtered if team.
-    
-    const unsubTimesheets = onSnapshot(doc(db, "users", user.uid), (userSnap) => {
-      const role = userSnap.data()?.role;
+    const unsubRoleCheck = onSnapshot(doc(db, "users", targetUid), (userSnap) => {
+      const data = userSnap.data();
+      const role = impersonatedUser?.role || data?.role;
       let finalQuery = query(collection(db, "timesheets"), orderBy("startTime", "desc"));
       
       if (role !== 'admin') {
         finalQuery = query(
           collection(db, "timesheets"), 
-          where("userId", "==", user.uid),
+          where("userId", "==", targetUid),
           orderBy("startTime", "desc")
         );
       }
@@ -119,16 +115,19 @@ const Timesheets = () => {
 
     return () => {
       unsubUser();
-      unsubTimesheets();
+      unsubRoleCheck();
     };
-  }, [user]);
+  }, [user, impersonatedUser]);
 
   const handleClockIn = async () => {
     if (!user) return;
+    const targetUid = impersonatedUser?.uid || user.uid;
+    const targetName = impersonatedUser?.displayName || user.displayName;
+
     try {
       await addDoc(collection(db, "timesheets"), {
-        userId: user.uid,
-        userName: user.displayName,
+        userId: targetUid,
+        userName: targetName,
         startTime: serverTimestamp(),
         status: "active",
         submissionStatus: "draft",
@@ -188,7 +187,7 @@ const Timesheets = () => {
   const handleManualSubmit = async () => {
     if (!user) return;
     try {
-      const targetUserId = manualEntry.userId || user.uid;
+      const targetUserId = (userRole === 'admin' && manualEntry.userId) ? manualEntry.userId : user.uid;
       const startTime = new Date(manualEntry.date + "T09:00:00");
       const endTime = new Date(startTime.getTime() + manualEntry.duration * 60 * 1000);
       
@@ -292,16 +291,18 @@ const Timesheets = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Duration (Minutes)</Label>
+                  <Label>Duration (Hours:Minutes)</Label>
                   <Input 
-                    type="number" 
-                    value={manualEntry.duration} 
-                    onChange={(e) => setManualEntry({...manualEntry, duration: parseInt(e.target.value) || 0})}
-                    placeholder="e.g. 480 for 8 hours"
+                    type="time" 
+                    value={`${Math.floor(manualEntry.duration / 60).toString().padStart(2, '0')}:${(manualEntry.duration % 60).toString().padStart(2, '0')}`}
+                    onChange={(e) => {
+                      const [h, m] = e.target.value.split(':').map(Number);
+                      setManualEntry({...manualEntry, duration: (h * 60) + m});
+                    }}
                     className="bg-white/5 border-white/10"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    {manualEntry.duration > 0 && `${Math.floor(manualEntry.duration / 60)}h ${manualEntry.duration % 60}m`}
+                    {manualEntry.duration > 0 && `${Math.floor(manualEntry.duration / 60)}h ${manualEntry.duration % 60}m (${manualEntry.duration} total minutes)`}
                   </p>
                 </div>
                 <div className="space-y-2">

@@ -71,11 +71,15 @@ const Messages = () => {
   }, [activeChat, user]);
 
   const handleSendMessage = async (type: 'chat' | 'email' | 'sms' = 'chat') => {
-    if (!newMessage.trim() || !activeChat || !user) return;
+    if (!newMessage.trim() || !activeChat || !user) {
+      console.warn("Cannot send message: check newMessage, activeChat, or user context", { newMessage, activeChat, userId: user?.uid });
+      return;
+    }
 
     try {
+      console.log(`Attempting to send ${type} to ${activeChat.id}`);
       const conversationId = [user.uid, activeChat.id].sort().join("_");
-      await addDoc(collection(db, "messages"), {
+      const docRef = await addDoc(collection(db, "messages"), {
         conversationId,
         senderId: user.uid,
         senderName: user.displayName || user.email,
@@ -85,6 +89,7 @@ const Messages = () => {
         type,
         createdAt: serverTimestamp()
       });
+      console.log("Message sent successfully, ID:", docRef.id);
 
       // Mock API call feedback
       if (type === 'email') {
@@ -95,6 +100,7 @@ const Messages = () => {
 
       setNewMessage("");
     } catch (error) {
+      console.error("Error sending message:", error);
       handleFirestoreError(error, OperationType.CREATE, "messages");
     }
   };
@@ -173,10 +179,22 @@ const Messages = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" title="Send Email">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-muted-foreground hover:text-white" 
+                  title="Send Email"
+                  onClick={() => handleSendMessage('email')}
+                >
                   <Mail className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" title="Send SMS">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="text-muted-foreground hover:text-white" 
+                  title="Send SMS"
+                  onClick={() => handleSendMessage('sms')}
+                >
                   <MessageCircle className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">

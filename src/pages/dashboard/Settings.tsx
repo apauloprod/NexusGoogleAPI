@@ -21,6 +21,13 @@ import {
   Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -41,7 +48,8 @@ import {
 } from "@/components/ui/dialog";
 
 const Settings = () => {
-  const { user } = useContext(AuthContext);
+  const { user, impersonatedUser } = useContext(AuthContext);
+  const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -57,18 +65,25 @@ const Settings = () => {
     businessName: "",
     businessDetails: "",
     businessLogo: "",
-    hourlyRate: 0
+    hourlyRate: 0,
+    jobVisibility: "all" as "all" | "own"
   });
 
   useEffect(() => {
     if (!user) return;
+    
+    // Get current user role
+    const unsubRole = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      setCurrentUserData(snap.data());
+    });
 
     // Fetch custom tasks
     const unsubTasks = onSnapshot(collection(db, "customTasks"), (snap) => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Fetch business data
+    // Fetch business data (usually from admin doc, which we assume is the primary user or a special config)
+    // For this app, we'll look for settings in the user doc of 'apauloprod@gmail.com' or the current logged in admin
     const unsubBusiness = onSnapshot(doc(db, "users", user.uid), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -76,7 +91,8 @@ const Settings = () => {
           businessName: data.businessName || "",
           businessDetails: data.businessDetails || "",
           businessLogo: data.businessLogo || "",
-          hourlyRate: data.hourlyRate || 0
+          hourlyRate: data.hourlyRate || 0,
+          jobVisibility: data.jobVisibility || "all"
         });
       }
     });
@@ -88,11 +104,21 @@ const Settings = () => {
     });
 
     return () => {
+      unsubRole();
       unsubTasks();
       unsubBusiness();
       unsubTeam();
     };
   }, [user]);
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'staff';
+  const isAdmin = role === 'admin';
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === "profile") {
+      setActiveTab("team"); // Redirect from profile if not admin
+    }
+  }, [isAdmin, activeTab]);
 
   const addCustomTask = async () => {
     if (!newTask.name) return;
@@ -315,11 +341,11 @@ const Settings = () => {
         {/* Sidebar Nav */}
         <div className="space-y-1">
           {[
-            { id: "profile", icon: Building2, label: "Business Profile" },
-            { id: "team", icon: Users, label: "Team Management" },
-            { id: "tasks", icon: Zap, label: "Custom Tasks" },
-            { id: "data", icon: Database, label: "Data & Backup" },
-          ].map((item) => (
+            { id: "profile", icon: Building2, label: "Business Profile", adminOnly: true },
+            { id: "team", icon: Users, label: "Team Management", adminOnly: false },
+            { id: "tasks", icon: Zap, label: "Custom Tasks", adminOnly: true },
+            { id: "data", icon: Database, label: "Data & Backup", adminOnly: true },
+          ].filter(item => !item.adminOnly || isAdmin).map((item) => (
             <Button 
               key={item.id} 
               variant="ghost" 
@@ -410,6 +436,25 @@ const Settings = () => {
                     className="bg-white/5 border-white/10 rounded-xl min-h-[100px]" 
                   />
                 </div>
+
+                {isAdmin && (
+                  <div className="space-y-2">
+                    <Label>Job Visibility (For Team Members)</Label>
+                    <Select 
+                      value={businessData.jobVisibility} 
+                      onValueChange={(v: any) => setBusinessData({...businessData, jobVisibility: v})}
+                    >
+                      <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black border-white/10">
+                        <SelectItem value="all">Team members can see ALL jobs</SelectItem>
+                        <SelectItem value="own">Team members can ONLY see their assigned jobs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">Controls what team members see in the Jobs and Schedule pages.</p>
+                  </div>
+                )}
               </div>
               
               <Button 
@@ -487,105 +532,126 @@ const Settings = () => {
                             <Badge className={member.role === 'admin' ? "bg-purple-500/10 text-purple-500" : "bg-blue-500/10 text-blue-500"}>
                               {member.role === 'admin' ? 'Admin' : 'Team Member'}
                             </Badge>
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3 text-emerald-400" />
-                              <Input 
-                                type="number"
-                                value={member.hourlyRate || 0}
-                                onChange={e => updateMemberRate(member.id, parseFloat(e.target.value))}
-                                className="h-6 w-16 bg-transparent border-none text-xs font-bold text-emerald-400 p-0 text-right focus-visible:ring-0"
-                              />
-                              <span className="text-[10px] text-muted-foreground">/hr</span>
+                            {isAdmin && (
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="h-3 w-3 text-emerald-400" />
+                                <Input 
+                                  type="number"
+                                  value={member.hourlyRate || 0}
+                                  onChange={e => updateMemberRate(member.id, parseFloat(e.target.value))}
+                                  className="h-6 w-16 bg-transparent border-none text-xs font-bold text-emerald-400 p-0 text-right focus-visible:ring-0"
+                                />
+                                <span className="text-[10px] text-muted-foreground">/hr</span>
+                              </div>
+                            )}
+                          </div>
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-muted-foreground hover:text-white"
+                                    onClick={() => fetchMemberDetails(member)}
+                                  >
+                                    <ShieldCheck className="h-4 w-4" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] max-h-[80vh] overflow-y-auto rounded-[2rem]">
+                                  <DialogHeader>
+                                    <DialogTitle className="text-2xl font-bold tracking-tighter flex items-center gap-3">
+                                      <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                                        {selectedMember?.photoURL ? <img src={selectedMember.photoURL} className="h-full w-full object-cover" /> : <User className="h-5 w-5" />}
+                                      </div>
+                                      {selectedMember?.displayName || selectedMember?.email}
+                                    </DialogTitle>
+                                  </DialogHeader>
+                                  <div className="space-y-6 pt-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="glass p-4 rounded-2xl border-white/5">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Role</p>
+                                        <p className="font-bold capitalize">{selectedMember?.role}</p>
+                                      </div>
+                                      <div className="glass p-4 rounded-2xl border-white/5">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Hourly Rate</p>
+                                        <p className="font-bold text-emerald-400">${selectedMember?.hourlyRate}/hr</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                      <h4 className="font-bold flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-blue-400" />
+                                        Recent Timesheets
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {memberDetails.timesheets.length === 0 ? (
+                                          <p className="text-sm text-muted-foreground">No timesheets found.</p>
+                                        ) : (
+                                          memberDetails.timesheets.slice(0, 5).map(ts => (
+                                            <div key={ts.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
+                                              <div>
+                                                <p className="text-sm font-bold">{format(ts.startTime.toDate(), "MMM d, yyyy")}</p>
+                                                <p className="text-xs text-muted-foreground">{ts.duration ? `${Math.floor(ts.duration/60)}h ${ts.duration%60}m` : "Running"}</p>
+                                              </div>
+                                              <Badge variant="outline" className="text-[10px] capitalize">{ts.submissionStatus}</Badge>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                      <h4 className="font-bold flex items-center gap-2">
+                                        <Plus className="h-4 w-4 text-emerald-400" />
+                                        Assigned Jobs
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {memberDetails.jobs.length === 0 ? (
+                                          <p className="text-sm text-muted-foreground">No jobs assigned.</p>
+                                        ) : (
+                                          memberDetails.jobs.slice(0, 5).map(job => (
+                                            <div key={job.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
+                                              <div>
+                                                <p className="text-sm font-bold">{job.title}</p>
+                                                <p className="text-xs text-muted-foreground">{job.clientName}</p>
+                                              </div>
+                                              <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 capitalize">{job.status}</Badge>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="pt-6 border-t border-white/5 flex gap-3">
+                                      <Button 
+                                        variant="outline" 
+                                        className="flex-1 bg-white/5 border-white/10"
+                                        onClick={() => updateRole(selectedMember?.id, selectedMember?.role === 'admin' ? 'team' : 'admin')}
+                                      >
+                                        Make {selectedMember?.role === 'admin' ? 'Staff' : 'Admin'}
+                                      </Button>
+                                      <Button 
+                                        variant="destructive" 
+                                        className="flex-1"
+                                        onClick={() => removeMember(selectedMember?.id)}
+                                      >
+                                        Remove Member
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-muted-foreground hover:text-red-400"
+                                onClick={() => removeMember(member.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-muted-foreground hover:text-white"
-                                  onClick={() => fetchMemberDetails(member)}
-                                >
-                                  <ShieldCheck className="h-4 w-4" />
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] max-h-[80vh] overflow-y-auto rounded-[2rem]">
-                                <DialogHeader>
-                                  <DialogTitle className="text-2xl font-bold tracking-tighter flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-                                      {selectedMember?.photoURL ? <img src={selectedMember.photoURL} className="h-full w-full object-cover" /> : <User className="h-5 w-5" />}
-                                    </div>
-                                    {selectedMember?.displayName || selectedMember?.email}
-                                  </DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-6 pt-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div className="glass p-4 rounded-2xl border-white/5">
-                                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Role</p>
-                                      <p className="font-bold capitalize">{selectedMember?.role}</p>
-                                    </div>
-                                    <div className="glass p-4 rounded-2xl border-white/5">
-                                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Hourly Rate</p>
-                                      <p className="font-bold text-emerald-400">${selectedMember?.hourlyRate}/hr</p>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-4">
-                                    <h4 className="font-bold flex items-center gap-2">
-                                      <Clock className="h-4 w-4 text-blue-400" />
-                                      Recent Timesheets
-                                    </h4>
-                                    <div className="space-y-2">
-                                      {memberDetails.timesheets.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">No timesheets found.</p>
-                                      ) : (
-                                        memberDetails.timesheets.slice(0, 5).map(ts => (
-                                          <div key={ts.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
-                                            <div>
-                                              <p className="text-sm font-bold">{format(ts.startTime.toDate(), "MMM d, yyyy")}</p>
-                                              <p className="text-xs text-muted-foreground">{ts.duration ? `${Math.floor(ts.duration/60)}h ${ts.duration%60}m` : "Running"}</p>
-                                            </div>
-                                            <Badge variant="outline" className="text-[10px] capitalize">{ts.submissionStatus}</Badge>
-                                          </div>
-                                        ))
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-4">
-                                    <h4 className="font-bold flex items-center gap-2">
-                                      <Plus className="h-4 w-4 text-emerald-400" />
-                                      Assigned Jobs
-                                    </h4>
-                                    <div className="space-y-2">
-                                      {memberDetails.jobs.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">No jobs assigned.</p>
-                                      ) : (
-                                        memberDetails.jobs.slice(0, 5).map(job => (
-                                          <div key={job.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
-                                            <div>
-                                              <p className="text-sm font-bold">{job.title}</p>
-                                              <p className="text-xs text-muted-foreground">{job.clientName}</p>
-                                            </div>
-                                            <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 capitalize">{job.status}</Badge>
-                                          </div>
-                                        ))
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-red-400"
-                              onClick={() => removeMember(member.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          )}
                         </div>
                       </div>
                     ))}
