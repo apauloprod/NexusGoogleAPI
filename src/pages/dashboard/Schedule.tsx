@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { AuthContext } from "../../App";
 import { useContext } from "react";
 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, subDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, subDays, addWeeks, addMonths, startOfWeek, endOfWeek } from "date-fns";
 
 const Schedule = () => {
   const { user, impersonatedUser } = useContext(AuthContext);
@@ -108,18 +108,34 @@ const Schedule = () => {
     });
   };
 
-  const handlePrevMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const handlePrev = () => {
+    if (viewMode === 'timeline') {
+      setCurrentDate(prev => addWeeks(prev, -1));
+    } else {
+      setCurrentDate(prev => startOfMonth(addMonths(prev, -1)));
+    }
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  const handleNext = () => {
+    if (viewMode === 'timeline') {
+      setCurrentDate(prev => addWeeks(prev, 1));
+    } else {
+      setCurrentDate(prev => startOfMonth(addMonths(prev, 1)));
+    }
   };
 
   const filteredVisits = visits.filter(item => {
     if (!item.scheduledAt) return false;
     const date = item.scheduledAt.toDate();
-    const isSameMonthYear = date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear();
+    
+    let isVisible = false;
+    if (viewMode === 'timeline') {
+      const sw = startOfWeek(currentDate);
+      const ew = endOfWeek(currentDate);
+      isVisible = date >= sw && date <= ew;
+    } else {
+      isVisible = date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear();
+    }
     
     // Privacy Logic:
     const role = currentUserData?.role || 'staff';
@@ -128,18 +144,17 @@ const Schedule = () => {
 
     if (role !== 'admin' && visibility === 'own') {
       if (item.type === 'job') {
-        return isSameMonthYear && (item.assignedTeam || []).includes(currentUserId);
+        return isVisible && (item.assignedTeam || []).includes(currentUserId);
       }
-      return isSameMonthYear; 
+      return isVisible; 
     }
 
-    return isSameMonthYear;
+    return isVisible;
   });
 
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(currentDate),
-    end: endOfMonth(currentDate)
-  });
+  const visibleDays = viewMode === 'timeline'
+    ? eachDayOfInterval({ start: startOfWeek(currentDate), end: endOfWeek(currentDate) })
+    : eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) });
 
   const groupedVisits = filteredVisits.reduce((acc, item) => {
     if (!item.scheduledAt) return acc;
@@ -187,13 +202,15 @@ const Schedule = () => {
             </Button>
           </div>
           <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={handlePrevMonth}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={handlePrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="px-4 text-sm font-bold min-w-[140px] text-center">
-              {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              {viewMode === 'timeline' 
+                ? `${format(startOfWeek(currentDate), "MMM d")} - ${format(endOfWeek(currentDate), "MMM d, yyyy")}`
+                : format(currentDate, "MMMM yyyy")}
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={handleNextMonth}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={handleNext}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -298,7 +315,7 @@ const Schedule = () => {
         ) : viewMode === 'timeline' ? (
           <div className="overflow-x-auto pb-6 -mx-8 px-8 no-scrollbar">
             <div className="flex gap-4 min-w-max">
-              {daysInMonth.map(day => {
+              {visibleDays.map(day => {
                 const dayItems = filteredVisits.filter(v => isSameDay(v.scheduledAt.toDate(), day));
                 return (
                   <div key={day.toISOString()} className="w-72 flex-shrink-0 space-y-4">

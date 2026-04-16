@@ -60,7 +60,19 @@ const Timesheets = () => {
   const [manualEntry, setManualEntry] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     duration: 0,
+    startTime: "09:00",
+    endTime: "17:00",
+    useTimes: true,
     type: "daily", // daily or weekly
+    weeklyEntries: [
+      { day: "Monday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+      { day: "Tuesday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+      { day: "Wednesday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+      { day: "Thursday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+      { day: "Friday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+      { day: "Saturday", duration: 0, startTime: "09:00", endTime: "17:00", active: false },
+      { day: "Sunday", duration: 0, startTime: "09:00", endTime: "17:00", active: false },
+    ],
     notes: "",
     userId: ""
   });
@@ -188,33 +200,91 @@ const Timesheets = () => {
     if (!user) return;
     try {
       const targetUserId = (userRole === 'admin' && manualEntry.userId) ? manualEntry.userId : user.uid;
-      const startTime = new Date(manualEntry.date + "T09:00:00");
-      const endTime = new Date(startTime.getTime() + manualEntry.duration * 60 * 1000);
-      
       const targetUserDoc = await getDoc(doc(db, "users", targetUserId));
       const targetUserData = targetUserDoc.exists() ? targetUserDoc.data() : {};
       const rate = targetUserData.hourlyRate || 0;
-      const totalCost = (manualEntry.duration / 60) * rate;
 
-      await addDoc(collection(db, "timesheets"), {
-        userId: targetUserId,
-        userName: targetUserData.displayName || targetUserData.email || "Unknown",
-        startTime: Timestamp.fromDate(startTime),
-        endTime: Timestamp.fromDate(endTime),
-        duration: manualEntry.duration,
-        totalCost,
-        submissionStatus: 'submitted',
-        submissionType: manualEntry.type,
-        notes: manualEntry.notes,
-        status: 'completed',
-        rate: rate,
-        createdAt: serverTimestamp()
-      });
+      if (manualEntry.type === 'daily') {
+        let finalDuration = manualEntry.duration;
+        let finalStart = new Date(manualEntry.date + "T" + manualEntry.startTime);
+        let finalEnd = new Date(manualEntry.date + "T" + manualEntry.endTime);
+
+        if (manualEntry.useTimes) {
+          finalDuration = differenceInMinutes(finalEnd, finalStart);
+        } else {
+          // If just duration, assume 9 AM start
+          finalStart = new Date(manualEntry.date + "T09:00:00");
+          finalEnd = new Date(finalStart.getTime() + manualEntry.duration * 60 * 1000);
+        }
+
+        const totalCost = (finalDuration / 60) * rate;
+
+        await addDoc(collection(db, "timesheets"), {
+          userId: targetUserId,
+          userName: targetUserData.displayName || targetUserData.email || "Unknown",
+          startTime: Timestamp.fromDate(finalStart),
+          endTime: Timestamp.fromDate(finalEnd),
+          duration: finalDuration,
+          totalCost,
+          submissionStatus: 'submitted',
+          submissionType: 'daily',
+          notes: manualEntry.notes,
+          status: 'completed',
+          rate: rate,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        // Weekly
+        for (const dayEntry of manualEntry.weeklyEntries) {
+          if (!dayEntry.active) continue;
+          
+          let dayDuration = dayEntry.duration;
+          let dayStart = new Date(manualEntry.date + "T" + dayEntry.startTime);
+          let dayEnd = new Date(manualEntry.date + "T" + dayEntry.endTime);
+
+          if (manualEntry.useTimes) {
+            dayDuration = differenceInMinutes(dayEnd, dayStart);
+          } else {
+            dayStart = new Date(manualEntry.date + "T09:00:00");
+            dayEnd = new Date(dayStart.getTime() + dayEntry.duration * 60 * 1000);
+          }
+
+          const totalCost = (dayDuration / 60) * rate;
+
+          await addDoc(collection(db, "timesheets"), {
+            userId: targetUserId,
+            userName: targetUserData.displayName || targetUserData.email || "Unknown",
+            startTime: Timestamp.fromDate(dayStart),
+            endTime: Timestamp.fromDate(dayEnd),
+            duration: dayDuration,
+            totalCost,
+            submissionStatus: 'submitted',
+            submissionType: 'weekly',
+            notes: manualEntry.notes,
+            status: 'completed',
+            rate: rate,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+
       setIsManualDialogOpen(false);
       setManualEntry({
         date: format(new Date(), "yyyy-MM-dd"),
         duration: 0,
+        startTime: "09:00",
+        endTime: "17:00",
+        useTimes: true,
         type: "daily",
+        weeklyEntries: [
+          { day: "Monday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+          { day: "Tuesday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+          { day: "Wednesday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+          { day: "Thursday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+          { day: "Friday", duration: 0, startTime: "09:00", endTime: "17:00", active: true },
+          { day: "Saturday", duration: 0, startTime: "09:00", endTime: "17:00", active: false },
+          { day: "Sunday", duration: 0, startTime: "09:00", endTime: "17:00", active: false },
+        ],
         notes: "",
         userId: ""
       });
@@ -247,7 +317,7 @@ const Timesheets = () => {
                 Manual Entry
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-black border-white/10 text-white rounded-[2rem]">
+            <DialogContent className="bg-black border-white/10 text-white rounded-[2rem] sm:max-w-[500px] max-h-[90vh] overflow-y-auto custom-scrollbar">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold tracking-tighter">Manual Timesheet Entry</DialogTitle>
               </DialogHeader>
@@ -269,20 +339,35 @@ const Timesheets = () => {
                     </Select>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label>Entry Type</Label>
-                  <Select value={manualEntry.type} onValueChange={(v) => setManualEntry({...manualEntry, type: v})}>
-                    <SelectTrigger className="bg-white/5 border-white/10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-black border-white/10">
-                      <SelectItem value="daily">Daily Entry</SelectItem>
-                      <SelectItem value="weekly">Weekly Entry</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Label>Entry Type</Label>
+                    <Select value={manualEntry.type} onValueChange={(v) => setManualEntry({...manualEntry, type: v as any})}>
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black border-white/10">
+                        <SelectItem value="daily">Daily Entry</SelectItem>
+                        <SelectItem value="weekly">Weekly Entry</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label>Input Mode</Label>
+                    <Select value={manualEntry.useTimes ? "times" : "duration"} onValueChange={(v) => setManualEntry({...manualEntry, useTimes: v === "times"})}>
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black border-white/10">
+                        <SelectItem value="times">Start & End Time</SelectItem>
+                        <SelectItem value="duration">Just Duration</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Date</Label>
+                  <Label>{manualEntry.type === 'weekly' ? 'Week Starting Date' : 'Date'}</Label>
                   <Input 
                     type="date" 
                     value={manualEntry.date} 
@@ -290,32 +375,119 @@ const Timesheets = () => {
                     className="bg-white/5 border-white/10"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Duration (Hours:Minutes)</Label>
-                  <Input 
-                    type="time" 
-                    value={`${Math.floor(manualEntry.duration / 60).toString().padStart(2, '0')}:${(manualEntry.duration % 60).toString().padStart(2, '0')}`}
-                    onChange={(e) => {
-                      const [h, m] = e.target.value.split(':').map(Number);
-                      setManualEntry({...manualEntry, duration: (h * 60) + m});
-                    }}
-                    className="bg-white/5 border-white/10"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    {manualEntry.duration > 0 && `${Math.floor(manualEntry.duration / 60)}h ${manualEntry.duration % 60}m (${manualEntry.duration} total minutes)`}
-                  </p>
-                </div>
+
+                {manualEntry.type === 'daily' ? (
+                  <div className="space-y-4 p-4 rounded-2xl bg-white/5 border border-white/5">
+                    {manualEntry.useTimes ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Start Time</Label>
+                          <Input 
+                            type="time" 
+                            value={manualEntry.startTime}
+                            onChange={(e) => setManualEntry({...manualEntry, startTime: e.target.value})}
+                            className="bg-white/5 border-white/10"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>End Time</Label>
+                          <Input 
+                            type="time" 
+                            value={manualEntry.endTime}
+                            onChange={(e) => setManualEntry({...manualEntry, endTime: e.target.value})}
+                            className="bg-white/5 border-white/10"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Duration (Hours:Minutes)</Label>
+                        <Input 
+                          type="time" 
+                          step="60"
+                          value={`${Math.floor(manualEntry.duration / 60).toString().padStart(2, '0')}:${(manualEntry.duration % 60).toString().padStart(2, '0')}`}
+                          onChange={(e) => {
+                            const [h, m] = e.target.value.split(':').map(Number);
+                            setManualEntry({...manualEntry, duration: (h * 60) + m});
+                          }}
+                          className="bg-white/5 border-white/10"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-xs uppercase font-bold text-muted-foreground">Weekly Daily Breakdown</Label>
+                    {manualEntry.weeklyEntries.map((day, idx) => (
+                      <div key={day.day} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                        <input 
+                          type="checkbox" 
+                          checked={day.active} 
+                          onChange={(e) => {
+                            const newWeekly = [...manualEntry.weeklyEntries];
+                            newWeekly[idx].active = e.target.checked;
+                            setManualEntry({...manualEntry, weeklyEntries: newWeekly});
+                          }}
+                          className="h-4 w-4 rounded border-white/10 bg-black text-blue-500"
+                        />
+                        <span className="text-xs font-bold w-20">{day.day}</span>
+                        {day.active && (
+                          <div className="flex-1 flex gap-2">
+                            {manualEntry.useTimes ? (
+                              <>
+                                <Input 
+                                  type="time" 
+                                  value={day.startTime}
+                                  onChange={(e) => {
+                                    const newWeekly = [...manualEntry.weeklyEntries];
+                                    newWeekly[idx].startTime = e.target.value;
+                                    setManualEntry({...manualEntry, weeklyEntries: newWeekly});
+                                  }}
+                                  className="h-7 bg-white/5 border-white/10 text-[10px] p-1"
+                                />
+                                <Input 
+                                  type="time" 
+                                  value={day.endTime}
+                                  onChange={(e) => {
+                                    const newWeekly = [...manualEntry.weeklyEntries];
+                                    newWeekly[idx].endTime = e.target.value;
+                                    setManualEntry({...manualEntry, weeklyEntries: newWeekly});
+                                  }}
+                                  className="h-7 bg-white/5 border-white/10 text-[10px] p-1"
+                                />
+                              </>
+                            ) : (
+                              <Input 
+                                type="time" 
+                                step="60"
+                                value={`${Math.floor(day.duration / 60).toString().padStart(2, '0')}:${(day.duration % 60).toString().padStart(2, '0')}`}
+                                onChange={(e) => {
+                                  const [h, m] = e.target.value.split(':').map(Number);
+                                  const newWeekly = [...manualEntry.weeklyEntries];
+                                  newWeekly[idx].duration = (h * 60) + (m || 0);
+                                  setManualEntry({...manualEntry, weeklyEntries: newWeekly});
+                                }}
+                                className="h-7 bg-white/5 border-white/10 text-[10px] p-1"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Notes</Label>
                   <Textarea 
                     value={manualEntry.notes}
                     onChange={(e) => setManualEntry({...manualEntry, notes: e.target.value})}
-                    placeholder="What did you work on?"
-                    className="bg-white/5 border-white/10"
+                    placeholder="Work description..."
+                    className="bg-white/5 border-white/10 min-h-[60px]"
                   />
                 </div>
-                <Button onClick={handleManualSubmit} className="w-full bg-white text-black hover:bg-white/90">
-                  Save Entry
+                <Button onClick={handleManualSubmit} className="w-full h-12 bg-white text-black font-bold rounded-xl hover:bg-white/90">
+                  Save Entries
                 </Button>
               </div>
             </DialogContent>

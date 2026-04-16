@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import { 
   Plus, 
   CheckSquare,
@@ -36,14 +37,22 @@ import { cn } from "@/lib/utils";
 
 const Jobs = () => {
   const { user, impersonatedUser } = useContext(AuthContext);
+  const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
   const [viewingMediaJob, setViewingMediaJob] = useState<any>(null);
   const [isConverting, setIsConverting] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useEffect(() => {
+    const search = searchParams.get("search");
+    if (search) {
+      setSearchTerm(search);
+    }
+  }, [searchParams]);
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
 
@@ -306,8 +315,11 @@ const Jobs = () => {
                     </span>
                   </div>
                   {job.quoteNumber && (
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Quote: {job.quoteNumber}
+                    <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                      Quote: 
+                      <Link to={`/dashboard/quotes?search=${job.quoteNumber}`} className="text-cyan-400 hover:underline font-medium">
+                        {job.quoteNumber}
+                      </Link>
                     </div>
                   )}
                 </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import { 
   Plus, 
   FileText,
@@ -32,13 +33,21 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const Invoices = () => {
+  const [searchParams] = useSearchParams();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any>(null);
   const [isSending, setIsSending] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useEffect(() => {
+    const search = searchParams.get("search");
+    if (search) {
+      setSearchTerm(search);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
@@ -243,6 +252,24 @@ const Invoices = () => {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">#{inv.invoiceNumber || inv.id.slice(0, 6)}</span>
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Due {inv.dueDate?.toDate().toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-1">
+                    {inv.quoteNumber && (
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                        Quote: 
+                        <Link to={`/dashboard/quotes?search=${inv.quoteNumber}`} className="text-cyan-400 hover:underline">
+                          {inv.quoteNumber}
+                        </Link>
+                      </div>
+                    )}
+                    {inv.jobId && (
+                      <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                        Job: 
+                        <Link to={`/dashboard/jobs?search=${inv.jobId}`} className="text-amber-400 hover:underline">
+                          {inv.jobId.slice(0, 8)}...
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

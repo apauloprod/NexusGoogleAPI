@@ -60,6 +60,7 @@ async function startServer() {
   app.post("/api/send-quote", async (req, res) => {
     console.log("Received request to send quote email:", req.body?.quote?.quoteNumber);
     const { quote, clientEmail, appUrl } = req.body;
+    const { businessName, businessDetails, businessLogo } = quote;
 
     if (!resend) {
       return res.status(500).json({ error: "Email service not configured. Please add RESEND_API_KEY to environment variables." });
@@ -69,31 +70,59 @@ async function startServer() {
       // 1. Generate PDF
       const doc = new jsPDF();
       
-      // Add content to PDF
+      // Add Logo if exists
+      if (businessLogo) {
+        try {
+          // Note: for production, you might want to fetch and convert to base64 first
+          // but jsPDF addImage supports URLs in many environments if they are accessible
+          doc.addImage(businessLogo, 'PNG', 20, 10, 30, 30);
+        } catch (e) {
+          console.error("Error adding logo to PDF:", e);
+        }
+      }
+
       doc.setFontSize(22);
-      doc.text("SERVICE QUOTE", 105, 20, { align: "center" });
+      doc.text("SERVICE QUOTE", 200, 20, { align: "right" });
       
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(businessName || "Service Provider", 20, 45);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (businessDetails) {
+        const detailsLines = doc.splitTextToSize(businessDetails, 80);
+        doc.text(detailsLines, 20, 52);
+      }
+
       doc.setFontSize(12);
-      doc.text(`Quote Number: ${quote.quoteNumber}`, 20, 40);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 48);
-      doc.text(`Client: ${quote.clientName}`, 20, 56);
+      doc.text(`Quote Number: ${quote.quoteNumber}`, 200, 45, { align: "right" });
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
+      
+      doc.setDrawColor(200);
+      doc.line(20, 80, 200, 80);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Bill To:", 20, 90);
+      doc.setFont("helvetica", "normal");
+      doc.text(quote.clientName, 20, 97);
       
       const tableData = quote.items.map((item: any) => [
         item.description,
-        `$${item.price.toLocaleString()}`
+        `$${(item.price || item.unitPrice || 0).toLocaleString()}`
       ]);
       
       autoTable(doc, {
-        startY: 70,
+        startY: 110,
         head: [['Description', 'Price']],
         body: tableData,
-        foot: [['Total', `$${quote.total.toLocaleString()}`]],
+        foot: [['Total', `$${(quote.total || quote.totalHT || 0).toLocaleString()}`]],
         theme: 'grid',
         headStyles: { fillColor: [0, 0, 0] },
       });
       
       if (quote.notes) {
-        const finalY = (doc as any).lastAutoTable?.finalY || 70;
+        const finalY = (doc as any).lastAutoTable?.finalY || 110;
         doc.text("Notes:", 20, finalY + 20);
         doc.setFontSize(10);
         doc.text(quote.notes, 20, finalY + 28, { maxWidth: 170 });
@@ -106,16 +135,23 @@ async function startServer() {
       const paymentUrl = `${appUrl}/#/pay?type=quote&id=${quote.id}`;
       
       const { data, error } = await resend.emails.send({
-        from: "CRM <onboarding@resend.dev>", // Replace with your verified domain
+        from: "CRM <onboarding@resend.dev>", 
         to: [clientEmail],
-        subject: `Quote #${quote.quoteNumber} from CRM`,
+        subject: `Quote #${quote.quoteNumber} from ${businessName || "CRM"}`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+              <div>
+                <h1 style="margin: 0; color: #333;">${businessName || "Quote"}</h1>
+                <p style="color: #666; font-size: 14px; white-space: pre-line;">${businessDetails || ""}</p>
+              </div>
+              ${businessLogo ? `<img src="${businessLogo}" style="height: 64px; object-fit: contain;" />` : ""}
+            </div>
             <h2 style="color: #333;">Hello ${quote.clientName},</h2>
             <p style="color: #555; line-height: 1.6;">Please find the attached quote <strong>#${quote.quoteNumber}</strong> for the requested services.</p>
             <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <p style="margin: 0; font-size: 14px; color: #888; text-transform: uppercase;">Total Amount</p>
-              <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #000;">$${quote.total.toLocaleString()}</p>
+              <p style="margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #000;">$${(quote.total || quote.totalHT || 0).toLocaleString()}</p>
             </div>
             <p style="color: #555; line-height: 1.6;">To proceed with this work, please click the button below to approve the quote online:</p>
             <div style="margin: 20px 0;">
@@ -146,6 +182,7 @@ async function startServer() {
 
   app.post("/api/send-invoice", async (req, res) => {
     const { invoice, clientEmail, appUrl } = req.body;
+    const { businessName, businessDetails, businessLogo } = invoice;
     console.log(`[INVOICE API] Request received for Invoice #${invoice?.invoiceNumber} to ${clientEmail}`);
     
     if (!resend) {
@@ -158,33 +195,60 @@ async function startServer() {
       console.log("[INVOICE API] Generating PDF...");
       const doc = new jsPDF();
       
+      // Add Logo if exists
+      if (businessLogo) {
+        try {
+          doc.addImage(businessLogo, 'PNG', 20, 10, 30, 30);
+        } catch (e) {
+          console.error("Error adding logo to PDF:", e);
+        }
+      }
+
       doc.setFontSize(22);
-      doc.text("INVOICE", 105, 20, { align: "center" });
+      doc.text("INVOICE", 200, 20, { align: "right" });
       
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(businessName || "Service Provider", 20, 45);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (businessDetails) {
+        const detailsLines = doc.splitTextToSize(businessDetails, 80);
+        doc.text(detailsLines, 20, 52);
+      }
+
       doc.setFontSize(12);
-      doc.text(`Invoice Number: ${invoice.invoiceNumber}`, 20, 40);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 48);
+      doc.text(`Invoice Number: ${invoice.invoiceNumber}`, 200, 45, { align: "right" });
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
       
       const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "N/A";
-      doc.text(`Due Date: ${dueDateStr}`, 20, 56);
-      doc.text(`Client: ${invoice.clientName}`, 20, 64);
+      doc.text(`Due Date: ${dueDateStr}`, 200, 59, { align: "right" });
+      
+      doc.setDrawColor(200);
+      doc.line(20, 80, 200, 80);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Bill To:", 20, 90);
+      doc.setFont("helvetica", "normal");
+      doc.text(invoice.clientName, 20, 97);
       
       const tableData = (invoice.items || []).map((item: any) => [
         item.description || "Service",
-        `$${(Number(item.price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+        `$${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
       ]);
       
       autoTable(doc, {
-        startY: 80,
+        startY: 110,
         head: [['Description', 'Price']],
         body: tableData,
-        foot: [['Total', `$${(Number(invoice.total) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`]],
+        foot: [['Total', `$${(Number(invoice.total) || Number(invoice.totalHT) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`]],
         theme: 'grid',
         headStyles: { fillColor: [0, 0, 0] },
       });
       
       if (invoice.notes) {
-        const finalY = (doc as any).lastAutoTable?.finalY || 80;
+        const finalY = (doc as any).lastAutoTable?.finalY || 110;
         doc.text("Notes:", 20, finalY + 20);
         doc.setFontSize(10);
         doc.text(invoice.notes, 20, finalY + 28, { maxWidth: 170 });
@@ -200,9 +264,16 @@ async function startServer() {
       const { data, error } = await resend.emails.send({
         from: "CRM <onboarding@resend.dev>",
         to: [clientEmail],
-        subject: `Invoice #${invoice.invoiceNumber} from CRM`,
+        subject: `Invoice #${invoice.invoiceNumber} from ${businessName || "CRM"}`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+              <div>
+                <h1 style="margin: 0; color: #333;">${businessName || "Invoice"}</h1>
+                <p style="color: #666; font-size: 14px; white-space: pre-line;">${businessDetails || ""}</p>
+              </div>
+              ${businessLogo ? `<img src="${businessLogo}" style="height: 64px; object-fit: contain;" />` : ""}
+            </div>
             <h2 style="color: #333;">Hello ${invoice.clientName},</h2>
             <p style="color: #555; line-height: 1.6;">Please find the attached invoice <strong>#${invoice.invoiceNumber}</strong> for services rendered.</p>
             <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">

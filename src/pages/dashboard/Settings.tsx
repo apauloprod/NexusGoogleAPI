@@ -66,7 +66,13 @@ const Settings = () => {
     businessDetails: "",
     businessLogo: "",
     hourlyRate: 0,
-    jobVisibility: "all" as "all" | "own"
+    jobVisibility: "all" as "all" | "own",
+    address: {
+      street: "",
+      city: "",
+      postcode: "",
+      country: ""
+    }
   });
 
   useEffect(() => {
@@ -82,8 +88,7 @@ const Settings = () => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Fetch business data (usually from admin doc, which we assume is the primary user or a special config)
-    // For this app, we'll look for settings in the user doc of 'apauloprod@gmail.com' or the current logged in admin
+    // Fetch business data
     const unsubBusiness = onSnapshot(doc(db, "users", user.uid), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -92,7 +97,8 @@ const Settings = () => {
           businessDetails: data.businessDetails || "",
           businessLogo: data.businessLogo || "",
           hourlyRate: data.hourlyRate || 0,
-          jobVisibility: data.jobVisibility || "all"
+          jobVisibility: data.jobVisibility || "all",
+          address: data.address || { street: "", city: "", postcode: "", country: "" }
         });
       }
     });
@@ -427,14 +433,59 @@ const Settings = () => {
                   </div>
                 </div>
 
+                <div className="space-y-4">
+                  <Label>Business Address</Label>
+                  <div className="grid grid-cols-1 gap-4">
+                    <Input 
+                      value={businessData.address.street}
+                      onChange={e => setBusinessData({
+                        ...businessData, 
+                        address: { ...businessData.address, street: e.target.value }
+                      })}
+                      placeholder="Street Address" 
+                      className="bg-white/5 border-white/10 rounded-xl h-12" 
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input 
+                        value={businessData.address.city}
+                        onChange={e => setBusinessData({
+                          ...businessData, 
+                          address: { ...businessData.address, city: e.target.value }
+                        })}
+                        placeholder="City" 
+                        className="bg-white/5 border-white/10 rounded-xl h-12" 
+                      />
+                      <Input 
+                        value={businessData.address.postcode}
+                        onChange={e => setBusinessData({
+                          ...businessData, 
+                          address: { ...businessData.address, postcode: e.target.value }
+                        })}
+                        placeholder="Postcode" 
+                        className="bg-white/5 border-white/10 rounded-xl h-12" 
+                      />
+                    </div>
+                    <Input 
+                      value={businessData.address.country}
+                      onChange={e => setBusinessData({
+                        ...businessData, 
+                        address: { ...businessData.address, country: e.target.value }
+                      })}
+                      placeholder="Country" 
+                      className="bg-white/5 border-white/10 rounded-xl h-12" 
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Business Details / Address</Label>
+                  <Label>Additional Business Details (Displayed on PDF)</Label>
                   <Textarea 
                     value={businessData.businessDetails}
                     onChange={e => setBusinessData({...businessData, businessDetails: e.target.value})}
-                    placeholder="Enter your business address and contact details..."
+                    placeholder="Enter registration numbers, VAT info, etc..."
                     className="bg-white/5 border-white/10 rounded-xl min-h-[100px]" 
                   />
+                  <p className="text-xs text-muted-foreground">This information will be displayed alongside your name on invoices and quotes.</p>
                 </div>
 
                 {isAdmin && (

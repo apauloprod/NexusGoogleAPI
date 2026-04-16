@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { 
   Plus, 
   FileText,
@@ -35,13 +36,21 @@ import autoTable from "jspdf-autotable";
 
 
 const Quotes = () => {
+  const [searchParams] = useSearchParams();
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<any>(null);
   const [isSending, setIsSending] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useEffect(() => {
+    const search = searchParams.get("search");
+    if (search) {
+      setSearchTerm(search);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));

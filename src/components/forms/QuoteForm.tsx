@@ -160,6 +160,10 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
       let quoteId = initialData?.id;
       
+      const fullBusinessDetails = businessSettings?.address 
+        ? `${businessSettings.address.street}\n${businessSettings.address.city}${businessSettings.address.postcode ? `, ${businessSettings.address.postcode}` : ""}\n${businessSettings.address.country}${businessSettings.businessDetails ? `\n\n${businessSettings.businessDetails}` : ""}`
+        : (businessSettings?.businessDetails || "");
+
       const quoteData = {
         ...values,
         clientName,
@@ -178,7 +182,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         }),
         ...totals,
         businessName: businessSettings?.businessName || "",
-        businessDetails: businessSettings?.businessDetails || "",
+        businessDetails: fullBusinessDetails,
         businessLogo: businessSettings?.businessLogo || "",
         updatedAt: serverTimestamp(),
       };
@@ -260,9 +264,20 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
             <h1 className="text-6xl font-bold tracking-tighter text-cyan-400">Quote</h1>
             <div className="space-y-1">
               <p className="text-xl font-bold text-white">{businessSettings?.businessName || "Your Company Name"}</p>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">
-                {businessSettings?.businessDetails || "77 Hammersmith Road, West Kensington\nLondon, W14 0QH\nPhone: 0208 668 381"}
-              </p>
+              <div className="text-sm text-muted-foreground whitespace-pre-line">
+                {businessSettings?.address ? (
+                  <>
+                    <p>{businessSettings.address.street}</p>
+                    <p>{businessSettings.address.city}{businessSettings.address.postcode ? `, ${businessSettings.address.postcode}` : ""}</p>
+                    <p>{businessSettings.address.country}</p>
+                  </>
+                ) : (
+                  <p>{businessSettings?.businessDetails || "77 Hammersmith Road, West Kensington\nLondon, W14 0QH\nPhone: 0208 668 381"}</p>
+                )}
+                {businessSettings?.address && businessSettings?.businessDetails && (
+                  <p className="mt-2 pt-2 border-t border-white/5">{businessSettings.businessDetails}</p>
+                )}
+              </div>
             </div>
           </div>
           <div className="h-32 w-32 rounded-full bg-orange-400 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
@@ -401,8 +416,8 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           <div className="space-y-2">
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-4">
-                <div className="flex gap-2 items-start">
-                  <div className="flex-1 space-y-2">
+                <div className="flex gap-4 items-start">
+                  <div className="flex-[2] space-y-2">
                     {customTasks.length > 0 && (
                       <Select onValueChange={(v) => {
                         const task = customTasks.find(t => t.id === v);
@@ -427,9 +442,37 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Description" {...field} className="bg-white/5 border-white/10" />
+                            <Input placeholder="Service / Item Description" {...field} className="bg-white/5 border-white/10" />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.unitPrice`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Price</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} className="bg-white/5 border-white/10 h-10" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="w-20">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Qty</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} className="bg-white/5 border-white/10 h-10" />
+                          </FormControl>
                         </FormItem>
                       )}
                     />
@@ -439,62 +482,12 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
                       type="button" 
                       variant="ghost" 
                       size="icon" 
-                      className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                      className="h-10 w-10 mt-6 text-muted-foreground hover:text-destructive"
                       onClick={() => remove(index)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.quantity`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Qty</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} className="bg-white/5 border-white/10 h-8" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.unit`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Unit</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="h, pcs..." className="bg-white/5 border-white/10 h-8" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.unitPrice`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Price</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} className="bg-white/5 border-white/10 h-8" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.vatRate`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">VAT%</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} className="bg-white/5 border-white/10 h-8" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
                 </div>
               </div>
             ))}
@@ -502,17 +495,9 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
 
           <div className="flex justify-end pt-4 border-t border-white/5">
             <div className="space-y-1 text-right">
-              <div className="flex justify-between gap-8 text-sm">
-                <span className="text-muted-foreground">Total HT:</span>
-                <span className="font-bold">${totals.totalHT.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between gap-8 text-sm">
-                <span className="text-muted-foreground">Total TVA:</span>
-                <span className="font-bold">${totals.totalVAT.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex justify-between gap-8 text-lg pt-2 border-t border-white/10">
-                <span className="font-bold text-white">Total TTC:</span>
-                <span className="font-bold text-emerald-400">${totals.totalTTC.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <div className="flex justify-between gap-8 text-2xl pt-2">
+                <span className="font-bold text-white tracking-tighter">Total</span>
+                <span className="font-black text-emerald-400 tracking-tighter">${totals.totalHT.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>
