@@ -28,6 +28,23 @@ import {
   Timestamp,
   getDoc
 } from "firebase/firestore";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AuthContext } from "../../App";
 import { format, differenceInMinutes } from "date-fns";
 
@@ -38,6 +55,13 @@ const Timesheets = () => {
   const [activeEntry, setActiveEntry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [hourlyRate, setHourlyRate] = useState<number>(0);
+  const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
+  const [manualEntry, setManualEntry] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    duration: 0,
+    type: "daily", // daily or weekly
+    notes: ""
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -151,20 +175,120 @@ const Timesheets = () => {
     return `${h}h ${m}m`;
   };
 
+  const handleManualSubmit = async () => {
+    if (!user) return;
+    try {
+      const startTime = new Date(manualEntry.date + "T09:00:00");
+      const endTime = new Date(startTime.getTime() + manualEntry.duration * 60 * 1000);
+      
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const rate = userDoc.exists() ? userDoc.data().hourlyRate || 0 : 0;
+      const totalCost = (manualEntry.duration / 60) * rate;
+
+      await addDoc(collection(db, "timesheets"), {
+        userId: user.uid,
+        userName: user.displayName || user.email,
+        startTime: Timestamp.fromDate(startTime),
+        endTime: Timestamp.fromDate(endTime),
+        duration: manualEntry.duration,
+        totalCost,
+        submissionStatus: 'submitted',
+        submissionType: manualEntry.type,
+        notes: manualEntry.notes,
+        status: 'completed',
+        rate: rate,
+        createdAt: serverTimestamp()
+      });
+      setIsManualDialogOpen(false);
+      setManualEntry({
+        date: format(new Date(), "yyyy-MM-dd"),
+        duration: 0,
+        type: "daily",
+        notes: ""
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "timesheets");
+    }
+  };
+
   if (loading) return <div className="p-8">Loading timesheets...</div>;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tighter">Timesheets</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-4xl font-bold tracking-tighter text-white flex items-center gap-3">
+            <Clock className="h-10 w-10 text-blue-500" />
+            Timesheets
+          </h1>
+          <p className="text-muted-foreground mt-1">
             {userRole === 'admin' 
               ? "Manage team hours and approve labor costs." 
               : "Track your work hours and submit for approval."}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="glass border-white/10 gap-2">
+                <Plus className="h-4 w-4" />
+                Manual Entry
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-black border-white/10 text-white rounded-[2rem]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold tracking-tighter">Manual Timesheet Entry</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Entry Type</Label>
+                  <Select value={manualEntry.type} onValueChange={(v) => setManualEntry({...manualEntry, type: v})}>
+                    <SelectTrigger className="bg-white/5 border-white/10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10">
+                      <SelectItem value="daily">Daily Entry</SelectItem>
+                      <SelectItem value="weekly">Weekly Entry</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input 
+                    type="date" 
+                    value={manualEntry.date} 
+                    onChange={(e) => setManualEntry({...manualEntry, date: e.target.value})}
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Duration (Minutes)</Label>
+                  <Input 
+                    type="number" 
+                    value={manualEntry.duration} 
+                    onChange={(e) => setManualEntry({...manualEntry, duration: parseInt(e.target.value) || 0})}
+                    placeholder="e.g. 480 for 8 hours"
+                    className="bg-white/5 border-white/10"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {manualEntry.duration > 0 && `${Math.floor(manualEntry.duration / 60)}h ${manualEntry.duration % 60}m`}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea 
+                    value={manualEntry.notes}
+                    onChange={(e) => setManualEntry({...manualEntry, notes: e.target.value})}
+                    placeholder="What did you work on?"
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <Button onClick={handleManualSubmit} className="w-full bg-white text-black hover:bg-white/90">
+                  Save Entry
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button 
             onClick={activeEntry ? handleClockOut : handleClockIn}
             className={`rounded-xl px-8 h-12 font-bold gap-2 transition-all duration-300 ${

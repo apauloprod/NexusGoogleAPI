@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, CheckCircle2, User as UserIcon } from "lucide-react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
@@ -334,34 +335,52 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         />
 
         <div className="space-y-3">
-          <FormLabel>Assign Team Members</FormLabel>
-          <div className="grid grid-cols-2 gap-2">
-            {availableTeam.map((member) => (
-              <Button
-                key={member.id}
-                type="button"
-                variant="outline"
-                className={cn(
-                  "justify-start gap-2 h-10 border-white/10",
-                  form.watch("assignedTeam")?.includes(member.id) 
-                    ? "bg-blue-500/20 border-blue-500/50 text-blue-400" 
-                    : "bg-white/5 hover:bg-white/10"
-                )}
-                onClick={() => {
-                  const current = form.getValues("assignedTeam") || [];
-                  if (current.includes(member.id)) {
-                    form.setValue("assignedTeam", current.filter(id => id !== member.id));
-                  } else {
-                    form.setValue("assignedTeam", [...current, member.id]);
-                  }
-                }}
-              >
-                <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                  {member.photoURL ? <img src={member.photoURL} className="h-full w-full object-cover" /> : <Plus className="h-3 w-3" />}
-                </div>
-                <span className="text-xs truncate">{member.displayName || member.email}</span>
-              </Button>
-            ))}
+          <FormLabel className="flex items-center justify-between">
+            Assign Team Members
+            <Badge variant="outline" className="text-[10px] uppercase font-bold">
+              {form.watch("assignedTeam")?.length || 0} Selected
+            </Badge>
+          </FormLabel>
+          <div className="flex flex-wrap gap-2">
+            {availableTeam.map((member) => {
+              const isSelected = form.watch("assignedTeam")?.includes(member.id);
+              return (
+                <Button
+                  key={member.id}
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    "h-auto py-2 px-3 rounded-2xl border-white/10 transition-all duration-300",
+                    isSelected 
+                      ? "bg-blue-500/20 border-blue-500/50 text-blue-400 ring-2 ring-blue-500/20" 
+                      : "bg-white/5 hover:bg-white/10"
+                  )}
+                  onClick={() => {
+                    const current = form.getValues("assignedTeam") || [];
+                    if (current.includes(member.id)) {
+                      form.setValue("assignedTeam", current.filter(id => id !== member.id));
+                    } else {
+                      form.setValue("assignedTeam", [...current, member.id]);
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
+                      {member.photoURL ? (
+                        <img src={member.photoURL} className="h-full w-full object-cover" />
+                      ) : (
+                        <UserIcon className="h-3 w-3" />
+                      )}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-bold leading-none">{member.displayName || member.email.split('@')[0]}</p>
+                      <p className="text-[10px] text-muted-foreground capitalize">{member.role}</p>
+                    </div>
+                    {isSelected && <CheckCircle2 className="h-3 w-3 ml-1" />}
+                  </div>
+                </Button>
+              );
+            })}
           </div>
         </div>
 

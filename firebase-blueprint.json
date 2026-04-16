@@ -33,17 +33,22 @@
             "properties": {
               "description": { "type": "string" },
               "quantity": { "type": "number" },
+              "unit": { "type": "string" },
               "unitPrice": { "type": "number" },
+              "vatRate": { "type": "number" },
+              "vatAmount": { "type": "number" },
               "total": { "type": "number" }
             }
           }
         },
-        "totalAmount": { "type": "number" },
+        "totalHT": { "type": "number" },
+        "totalVAT": { "type": "number" },
+        "totalTTC": { "type": "number" },
         "status": { "type": "string", "enum": ["draft", "sent", "accepted", "rejected"] },
         "notes": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["requestId", "totalAmount", "status", "createdAt"]
+      "required": ["clientId", "totalTTC", "status", "createdAt"]
     },
     "Job": {
       "title": "Job",
@@ -72,12 +77,29 @@
         "id": { "type": "string" },
         "jobId": { "type": "string" },
         "clientId": { "type": "string" },
-        "amount": { "type": "number" },
+        "items": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unit": { "type": "string" },
+              "unitPrice": { "type": "number" },
+              "vatRate": { "type": "number" },
+              "vatAmount": { "type": "number" },
+              "total": { "type": "number" }
+            }
+          }
+        },
+        "totalHT": { "type": "number" },
+        "totalVAT": { "type": "number" },
+        "totalTTC": { "type": "number" },
         "status": { "type": "string", "enum": ["draft", "sent", "paid", "overdue"] },
         "dueDate": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["jobId", "amount", "status", "createdAt"]
+      "required": ["clientId", "totalTTC", "status", "createdAt"]
     },
     "Client": {
       "title": "Client",

@@ -16,7 +16,9 @@ import {
   UserPlus,
   DollarSign,
   Building2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Plus,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +27,18 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc, getDoc, where, orderBy, getDocs } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../../firebase";
 import { AuthContext } from "../../App";
+import { format } from "date-fns";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const Settings = () => {
   const { user } = useContext(AuthContext);
@@ -35,6 +47,10 @@ const Settings = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberName, setNewMemberName] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [memberDetails, setMemberDetails] = useState<{timesheets: any[], jobs: any[]}>({timesheets: [], jobs: []});
+
   const [businessData, setBusinessData] = useState({
     businessName: "",
     businessDetails: "",
@@ -69,6 +85,48 @@ const Settings = () => {
       unsubTeam();
     };
   }, [user]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `logos/${user.uid}/${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setBusinessData(prev => ({ ...prev, businessLogo: url }));
+      await updateDoc(doc(db, "users", user.uid), { businessLogo: url });
+    } catch (error) {
+      console.error("Error uploading logo:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const fetchMemberDetails = async (member: any) => {
+    setSelectedMember(member);
+    
+    // Fetch timesheets
+    const tsQuery = query(
+      collection(db, "timesheets"), 
+      where("userId", "==", member.id),
+      orderBy("startTime", "desc")
+    );
+    const tsSnap = await getDocs(tsQuery);
+    const timesheets = tsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Fetch jobs
+    const jobsQuery = query(
+      collection(db, "jobs"),
+      where("assignedTeam", "array-contains", member.id),
+      orderBy("createdAt", "desc")
+    );
+    const jobsSnap = await getDocs(jobsQuery);
+    const jobs = jobsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    setMemberDetails({ timesheets, jobs });
+  };
 
   const handleSaveBusiness = async () => {
     if (!user) return;
@@ -280,19 +338,36 @@ const Settings = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Business Logo URL</Label>
-                  <div className="flex gap-4">
-                    <Input 
-                      value={businessData.businessLogo}
-                      onChange={e => setBusinessData({...businessData, businessLogo: e.target.value})}
-                      placeholder="https://example.com/logo.png" 
-                      className="bg-white/5 border-white/10 rounded-xl h-12 flex-1" 
-                    />
-                    {businessData.businessLogo && (
-                      <div className="h-12 w-12 rounded-xl border border-white/10 overflow-hidden bg-white/5">
-                        <img src={businessData.businessLogo} alt="Logo Preview" className="h-full w-full object-contain" />
-                      </div>
-                    )}
+                  <Label>Business Logo</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="h-24 w-24 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center overflow-hidden bg-white/5 relative group">
+                      {businessData.businessLogo ? (
+                        <>
+                          <img src={businessData.businessLogo} alt="Logo" className="h-full w-full object-contain p-2" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Label htmlFor="logo-upload" className="cursor-pointer text-xs font-bold text-white">Change</Label>
+                          </div>
+                        </>
+                      ) : (
+                        <Label htmlFor="logo-upload" className="cursor-pointer flex flex-col items-center gap-2 text-muted-foreground hover:text-white transition-colors">
+                          <ImageIcon className="h-6 w-6" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Upload</span>
+                        </Label>
+                      )}
+                      <Input 
+                        id="logo-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleLogoUpload}
+                        disabled={isUploading}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-bold">Company Logo</p>
+                      <p className="text-xs text-muted-foreground">Recommended size: 512x512px. PNG or JPG.</p>
+                      {isUploading && <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 animate-pulse">Uploading...</Badge>}
+                    </div>
                   </div>
                 </div>
 
@@ -394,14 +469,84 @@ const Settings = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-white"
-                              onClick={() => updateRole(member.id, member.role === 'admin' ? 'team' : 'admin')}
-                            >
-                              <ShieldCheck className="h-4 w-4" />
-                            </Button>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-muted-foreground hover:text-white"
+                                  onClick={() => fetchMemberDetails(member)}
+                                >
+                                  <ShieldCheck className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] max-h-[80vh] overflow-y-auto rounded-[2rem]">
+                                <DialogHeader>
+                                  <DialogTitle className="text-2xl font-bold tracking-tighter flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                                      {selectedMember?.photoURL ? <img src={selectedMember.photoURL} className="h-full w-full object-cover" /> : <User className="h-5 w-5" />}
+                                    </div>
+                                    {selectedMember?.displayName || selectedMember?.email}
+                                  </DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-6 pt-4">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="glass p-4 rounded-2xl border-white/5">
+                                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Role</p>
+                                      <p className="font-bold capitalize">{selectedMember?.role}</p>
+                                    </div>
+                                    <div className="glass p-4 rounded-2xl border-white/5">
+                                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Hourly Rate</p>
+                                      <p className="font-bold text-emerald-400">${selectedMember?.hourlyRate}/hr</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    <h4 className="font-bold flex items-center gap-2">
+                                      <Clock className="h-4 w-4 text-blue-400" />
+                                      Recent Timesheets
+                                    </h4>
+                                    <div className="space-y-2">
+                                      {memberDetails.timesheets.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">No timesheets found.</p>
+                                      ) : (
+                                        memberDetails.timesheets.slice(0, 5).map(ts => (
+                                          <div key={ts.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
+                                            <div>
+                                              <p className="text-sm font-bold">{format(ts.startTime.toDate(), "MMM d, yyyy")}</p>
+                                              <p className="text-xs text-muted-foreground">{ts.duration ? `${Math.floor(ts.duration/60)}h ${ts.duration%60}m` : "Running"}</p>
+                                            </div>
+                                            <Badge variant="outline" className="text-[10px] capitalize">{ts.submissionStatus}</Badge>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    <h4 className="font-bold flex items-center gap-2">
+                                      <Plus className="h-4 w-4 text-emerald-400" />
+                                      Assigned Jobs
+                                    </h4>
+                                    <div className="space-y-2">
+                                      {memberDetails.jobs.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">No jobs assigned.</p>
+                                      ) : (
+                                        memberDetails.jobs.slice(0, 5).map(job => (
+                                          <div key={job.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center">
+                                            <div>
+                                              <p className="text-sm font-bold">{job.title}</p>
+                                              <p className="text-xs text-muted-foreground">{job.clientName}</p>
+                                            </div>
+                                            <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 capitalize">{job.status}</Badge>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                             <Button 
                               variant="ghost" 
                               size="icon" 
