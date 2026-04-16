@@ -45,6 +45,8 @@ const Settings = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
+  const [newTask, setNewTask] = useState({ name: "", description: "", defaultPrice: 0 });
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberName, setNewMemberName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -60,6 +62,11 @@ const Settings = () => {
 
   useEffect(() => {
     if (!user) return;
+
+    // Fetch custom tasks
+    const unsubTasks = onSnapshot(collection(db, "customTasks"), (snap) => {
+      setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
     // Fetch business data
     const unsubBusiness = onSnapshot(doc(db, "users", user.uid), (snap) => {
@@ -81,10 +88,32 @@ const Settings = () => {
     });
 
     return () => {
+      unsubTasks();
       unsubBusiness();
       unsubTeam();
     };
   }, [user]);
+
+  const addCustomTask = async () => {
+    if (!newTask.name) return;
+    try {
+      await addDoc(collection(db, "customTasks"), {
+        ...newTask,
+        createdAt: serverTimestamp()
+      });
+      setNewTask({ name: "", description: "", defaultPrice: 0 });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "customTasks");
+    }
+  };
+
+  const deleteCustomTask = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "customTasks", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "customTasks");
+    }
+  };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -288,6 +317,7 @@ const Settings = () => {
           {[
             { id: "profile", icon: Building2, label: "Business Profile" },
             { id: "team", icon: Users, label: "Team Management" },
+            { id: "tasks", icon: Zap, label: "Custom Tasks" },
             { id: "data", icon: Database, label: "Data & Backup" },
           ].map((item) => (
             <Button 
@@ -559,6 +589,81 @@ const Settings = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab === "tasks" && (
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <Zap className="h-5 w-5 text-emerald-500" />
+                </div>
+                <h2 className="text-2xl font-bold">Custom Tasks</h2>
+              </div>
+              
+              <div className="glass p-8 rounded-3xl border-white/5 space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Task Name</Label>
+                    <Input 
+                      placeholder="e.g. Lawn Mowing" 
+                      value={newTask.name}
+                      onChange={(e) => setNewTask({...newTask, name: e.target.value})}
+                      className="bg-white/5 border-white/10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Default Price</Label>
+                    <Input 
+                      type="number"
+                      placeholder="0.00" 
+                      value={newTask.defaultPrice}
+                      onChange={(e) => setNewTask({...newTask, defaultPrice: parseFloat(e.target.value) || 0})}
+                      className="bg-white/5 border-white/10"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label>Description</Label>
+                    <Textarea 
+                      placeholder="Brief description of the task..." 
+                      value={newTask.description}
+                      onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+                      className="bg-white/5 border-white/10"
+                    />
+                  </div>
+                </div>
+                <Button onClick={addCustomTask} className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                  <Plus className="h-4 w-4" />
+                  Add Task
+                </Button>
+
+                <div className="pt-8 border-t border-white/5">
+                  <h3 className="text-lg font-bold mb-4">Existing Tasks</h3>
+                  <div className="grid gap-4">
+                    {customTasks.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No custom tasks added yet.</p>
+                    ) : (
+                      customTasks.map((task) => (
+                        <div key={task.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                          <div>
+                            <p className="font-bold">{task.name}</p>
+                            <p className="text-sm text-muted-foreground">{task.description}</p>
+                            <p className="text-xs text-emerald-400 mt-1 font-bold">${task.defaultPrice.toFixed(2)}</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteCustomTask(task.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>

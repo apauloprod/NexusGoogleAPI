@@ -55,12 +55,14 @@ const Timesheets = () => {
   const [activeEntry, setActiveEntry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [hourlyRate, setHourlyRate] = useState<number>(0);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
   const [manualEntry, setManualEntry] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     duration: 0,
     type: "daily", // daily or weekly
-    notes: ""
+    notes: "",
+    userId: ""
   });
 
   useEffect(() => {
@@ -72,6 +74,14 @@ const Timesheets = () => {
         const data = snap.data();
         setUserRole(data.role);
         setHourlyRate(data.hourlyRate || 0);
+        
+        if (data.role === 'admin') {
+          // Fetch all team members for assignment
+          const qTeam = query(collection(db, "users"));
+          onSnapshot(qTeam, (teamSnap) => {
+            setTeamMembers(teamSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          });
+        }
       }
     });
 
@@ -178,16 +188,18 @@ const Timesheets = () => {
   const handleManualSubmit = async () => {
     if (!user) return;
     try {
+      const targetUserId = manualEntry.userId || user.uid;
       const startTime = new Date(manualEntry.date + "T09:00:00");
       const endTime = new Date(startTime.getTime() + manualEntry.duration * 60 * 1000);
       
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const rate = userDoc.exists() ? userDoc.data().hourlyRate || 0 : 0;
+      const targetUserDoc = await getDoc(doc(db, "users", targetUserId));
+      const targetUserData = targetUserDoc.exists() ? targetUserDoc.data() : {};
+      const rate = targetUserData.hourlyRate || 0;
       const totalCost = (manualEntry.duration / 60) * rate;
 
       await addDoc(collection(db, "timesheets"), {
-        userId: user.uid,
-        userName: user.displayName || user.email,
+        userId: targetUserId,
+        userName: targetUserData.displayName || targetUserData.email || "Unknown",
         startTime: Timestamp.fromDate(startTime),
         endTime: Timestamp.fromDate(endTime),
         duration: manualEntry.duration,
@@ -204,7 +216,8 @@ const Timesheets = () => {
         date: format(new Date(), "yyyy-MM-dd"),
         duration: 0,
         type: "daily",
-        notes: ""
+        notes: "",
+        userId: ""
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "timesheets");
@@ -240,6 +253,23 @@ const Timesheets = () => {
                 <DialogTitle className="text-2xl font-bold tracking-tighter">Manual Timesheet Entry</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
+                {userRole === 'admin' && (
+                  <div className="space-y-2">
+                    <Label>Team Member</Label>
+                    <Select value={manualEntry.userId} onValueChange={(v) => setManualEntry({...manualEntry, userId: v})}>
+                      <SelectTrigger className="bg-white/5 border-white/10">
+                        <SelectValue placeholder="Select team member" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-black border-white/10">
+                        {teamMembers.map(member => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.displayName || member.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Entry Type</Label>
                   <Select value={manualEntry.type} onValueChange={(v) => setManualEntry({...manualEntry, type: v})}>

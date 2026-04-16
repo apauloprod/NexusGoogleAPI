@@ -84,7 +84,21 @@ const Schedule = () => {
     });
   };
 
-  const groupedVisits = visits.reduce((acc, item) => {
+  const handlePrevMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const filteredVisits = visits.filter(item => {
+    if (!item.scheduledAt) return false;
+    const date = item.scheduledAt.toDate();
+    return date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear();
+  });
+
+  const groupedVisits = filteredVisits.reduce((acc, item) => {
     if (!item.scheduledAt) return acc;
     const dateStr = item.scheduledAt.toDate().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
     if (!acc[dateStr]) acc[dateStr] = [];
@@ -121,13 +135,13 @@ const Schedule = () => {
             </Button>
           </div>
           <div className="flex items-center bg-white/5 rounded-xl border border-white/10 p-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={handlePrevMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="px-4 text-sm font-bold">
+            <div className="px-4 text-sm font-bold min-w-[140px] text-center">
               {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={handleNextMonth}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -230,7 +244,7 @@ const Schedule = () => {
             ))}
           </div>
         ) : (
-          visits.map((item) => (
+          filteredVisits.map((item) => (
             <div key={item.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
               <div className="w-24 text-center border-r border-white/10 pr-6">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">

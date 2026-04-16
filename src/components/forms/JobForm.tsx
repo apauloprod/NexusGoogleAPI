@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CheckCircle2, User as UserIcon } from "lucide-react";
+import { Plus, Trash2, CheckCircle2, User as UserIcon, Search } from "lucide-react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp } from "firebase/firestore";
 import { useState, useEffect } from "react";
@@ -55,6 +55,7 @@ import { SchedulePicker } from "../SchedulePicker";
 export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableTeam, setAvailableTeam] = useState<any[]>([]);
+  const [teamSearch, setTeamSearch] = useState("");
 
   useEffect(() => {
     const q = query(collection(db, "users"));
@@ -62,6 +63,10 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       setAvailableTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
   }, []);
+
+  const filteredTeam = availableTeam.filter(m => 
+    (m.displayName || m.email || "").toLowerCase().includes(teamSearch.toLowerCase())
+  );
 
   const form = useForm({
     resolver: zodResolver(jobSchema),
@@ -335,14 +340,23 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         />
 
         <div className="space-y-3">
-          <FormLabel className="flex items-center justify-between">
-            Assign Team Members
+          <div className="flex items-center justify-between">
+            <FormLabel>Assign Team Members</FormLabel>
             <Badge variant="outline" className="text-[10px] uppercase font-bold">
               {form.watch("assignedTeam")?.length || 0} Selected
             </Badge>
-          </FormLabel>
-          <div className="flex flex-wrap gap-2">
-            {availableTeam.map((member) => {
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search team members..." 
+              className="pl-10 bg-white/5 border-white/10 h-10 rounded-xl"
+              value={teamSearch}
+              onChange={(e) => setTeamSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-1">
+            {filteredTeam.map((member) => {
               const isSelected = form.watch("assignedTeam")?.includes(member.id);
               return (
                 <Button

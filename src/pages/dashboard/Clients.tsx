@@ -135,21 +135,20 @@ const Clients = () => {
           <div className="col-span-full h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No clients found.</div>
         ) : (
           filteredClients.map((client) => (
-            <div key={client.id} className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden">
+            <div 
+              key={client.id} 
+              className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden cursor-pointer"
+              onClick={() => setEditingClient(client)}
+            >
               <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-8 w-8 text-muted-foreground hover:text-white"
-                  onClick={() => setEditingClient(client)}
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
                   className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => setClientToDelete(client)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setClientToDelete(client);
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -188,7 +187,7 @@ const Clients = () => {
                   {getStatusBadge(client.status)}
                 </div>
                 <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white">
-                  View Details
+                  Edit Details
                   <ArrowUpRight className="h-3 w-3" />
                 </Button>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
   Plus, 
   MessageSquare,
@@ -7,58 +7,144 @@ import {
   User as UserIcon,
   MoreVertical,
   Phone,
-  Video
+  Video,
+  Mail,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { db, handleFirestoreError, OperationType } from "../../firebase";
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, where, Timestamp } from "firebase/firestore";
+import { AuthContext } from "../../App";
+import { format } from "date-fns";
 
 const Messages = () => {
+  const { user } = useContext(AuthContext);
   const [activeChat, setActiveChat] = useState<any>(null);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const chats = [
-    { id: 1, name: "John Doe", lastMessage: "When can you start the project?", time: "2m ago", unread: 2 },
-    { id: 2, name: "Sarah Smith", lastMessage: "The quote looks good, let's proceed.", time: "1h ago", unread: 0 },
-    { id: 3, name: "Mike Johnson", lastMessage: "Can we reschedule the visit?", time: "3h ago", unread: 0 },
-  ];
+  useEffect(() => {
+    if (!user) return;
+
+    // Fetch team members and clients as contacts
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      const users = snap.docs.map(d => ({ id: d.id, type: 'team', ...d.data() }));
+      setContacts(prev => {
+        const clients = prev.filter(c => c.type === 'client');
+        return [...users, ...clients];
+      });
+    });
+
+    const unsubClients = onSnapshot(collection(db, "clients"), (snap) => {
+      const clients = snap.docs.map(d => ({ id: d.id, type: 'client', ...d.data() }));
+      setContacts(prev => {
+        const users = prev.filter(c => c.type === 'team');
+        return [...users, ...clients];
+      });
+    });
+
+    return () => {
+      unsubUsers();
+      unsubClients();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!activeChat || !user) return;
+
+    const q = query(
+      collection(db, "messages"),
+      where("conversationId", "==", [user.uid, activeChat.id].sort().join("_")),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => unsub();
+  }, [activeChat, user]);
+
+  const handleSendMessage = async (type: 'chat' | 'email' | 'sms' = 'chat') => {
+    if (!newMessage.trim() || !activeChat || !user) return;
+
+    try {
+      const conversationId = [user.uid, activeChat.id].sort().join("_");
+      await addDoc(collection(db, "messages"), {
+        conversationId,
+        senderId: user.uid,
+        senderName: user.displayName || user.email,
+        receiverId: activeChat.id,
+        receiverName: activeChat.displayName || activeChat.name || activeChat.email,
+        content: newMessage,
+        type,
+        createdAt: serverTimestamp()
+      });
+
+      // Mock API call feedback
+      if (type === 'email') {
+        console.log(`Sending email to ${activeChat.email}: ${newMessage}`);
+      } else if (type === 'sms') {
+        console.log(`Sending SMS to ${activeChat.phone}: ${newMessage}`);
+      }
+
+      setNewMessage("");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "messages");
+    }
+  };
+
+  const filteredContacts = contacts.filter(c => 
+    (c.displayName || c.name || c.email)?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
-      {/* Chat List */}
+      {/* Contact List */}
       <div className="w-80 border-r border-white/5 flex flex-col bg-black/20">
         <div className="p-6 border-b border-white/5">
           <h1 className="text-2xl font-bold tracking-tighter mb-4">Messages</h1>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search chats..." className="pl-10 bg-white/5 border-white/10 rounded-xl h-10" />
+            <Input 
+              placeholder="Search contacts..." 
+              className="pl-10 bg-white/5 border-white/10 rounded-xl h-10" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {chats.map((chat) => (
+            {filteredContacts.map((contact) => (
               <button
-                key={chat.id}
-                onClick={() => setActiveChat(chat)}
+                key={contact.id}
+                onClick={() => setActiveChat(contact)}
                 className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all ${
-                  activeChat?.id === chat.id ? "bg-white/10" : "hover:bg-white/5"
+                  activeChat?.id === contact.id ? "bg-white/10" : "hover:bg-white/5"
                 }`}
               >
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                  <UserIcon className="h-6 w-6 text-muted-foreground" />
+                  {contact.photoURL ? (
+                    <img src={contact.photoURL} className="h-12 w-12 rounded-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <UserIcon className="h-6 w-6 text-muted-foreground" />
+                  )}
                 </div>
                 <div className="flex-1 text-left overflow-hidden">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-sm">{chat.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{chat.time}</span>
+                    <span className="font-bold text-sm truncate">{contact.displayName || contact.name || contact.email}</span>
+                    <Badge variant="outline" className="text-[8px] uppercase px-1">
+                      {contact.type}
+                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
+                  <p className="text-xs text-muted-foreground truncate">{contact.email}</p>
                 </div>
-                {chat.unread > 0 && (
-                  <div className="h-5 w-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center shrink-0">
-                    {chat.unread}
-                  </div>
-                )}
               </button>
             ))}
           </div>
@@ -73,19 +159,25 @@ const Messages = () => {
             <div className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-black/50 backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <UserIcon className="h-5 w-5 text-muted-foreground" />
+                  {activeChat.photoURL ? (
+                    <img src={activeChat.photoURL} className="h-10 w-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <UserIcon className="h-5 w-5 text-muted-foreground" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-bold">{activeChat.name}</p>
-                  <p className="text-[10px] text-emerald-500 font-medium">Online</p>
+                  <p className="text-sm font-bold">{activeChat.displayName || activeChat.name || activeChat.email}</p>
+                  <p className="text-[10px] text-emerald-500 font-medium">
+                    {activeChat.phone || "No phone"} • {activeChat.email}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <Phone className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" title="Send Email">
+                  <Mail className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                  <Video className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" title="Send SMS">
+                  <MessageCircle className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
                   <MoreVertical className="h-4 w-4" />
@@ -96,42 +188,67 @@ const Messages = () => {
             {/* Messages Area */}
             <ScrollArea className="flex-1 p-6">
               <div className="space-y-6">
-                <div className="flex justify-center">
-                  <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-widest">
-                    Today
-                  </Badge>
-                </div>
-                <div className="flex gap-3 max-w-[80%]">
-                  <div className="h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`flex gap-3 max-w-[80%] ${msg.senderId === user.uid ? 'ml-auto flex-row-reverse' : ''}`}>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                      msg.senderId === user.uid ? 'bg-white border border-white' : 'bg-white/5 border border-white/10'
+                    }`}>
+                      <UserIcon className={`h-4 w-4 ${msg.senderId === user.uid ? 'text-black' : 'text-muted-foreground'}`} />
+                    </div>
+                    <div className={`p-4 rounded-2xl ${
+                      msg.senderId === user.uid 
+                        ? 'bg-white text-black rounded-tr-none' 
+                        : 'bg-white/5 border border-white/10 rounded-tl-none'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-bold uppercase opacity-60">{msg.type}</span>
+                      </div>
+                      <p className="text-sm">{msg.content}</p>
+                      <p className={`text-[10px] mt-2 ${msg.senderId === user.uid ? 'text-black/60' : 'text-muted-foreground'}`}>
+                        {msg.createdAt?.toDate() ? format(msg.createdAt.toDate(), "HH:mm") : "..."}
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-4 rounded-2xl rounded-tl-none bg-white/5 border border-white/10">
-                    <p className="text-sm">Hello! I'm interested in the AI implementation service. When can you start the project?</p>
-                    <p className="text-[10px] text-muted-foreground mt-2">09:41 AM</p>
-                  </div>
-                </div>
-                <div className="flex gap-3 max-w-[80%] ml-auto flex-row-reverse">
-                  <div className="h-8 w-8 rounded-full bg-white border border-white flex items-center justify-center shrink-0">
-                    <UserIcon className="h-4 w-4 text-black" />
-                  </div>
-                  <div className="p-4 rounded-2xl rounded-tr-none bg-white text-black">
-                    <p className="text-sm font-medium">Hi John! We can start as early as next week. Would you like to schedule a consultation?</p>
-                    <p className="text-[10px] text-black/60 mt-2">09:45 AM</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </ScrollArea>
 
             {/* Input Area */}
             <div className="p-6 border-t border-white/5 bg-black/50 backdrop-blur-xl">
-              <div className="flex items-center gap-4">
-                <Input 
-                  placeholder="Type a message..." 
-                  className="flex-1 bg-white/5 border-white/10 rounded-xl h-12 focus:ring-white/20"
-                />
-                <Button className="h-12 w-12 rounded-xl bg-white text-black hover:bg-white/90 shrink-0">
-                  <Send className="h-5 w-5" />
-                </Button>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-4">
+                  <Input 
+                    placeholder="Type a message..." 
+                    className="flex-1 bg-white/5 border-white/10 rounded-xl h-12 focus:ring-white/20"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage('chat')}
+                  />
+                  <Button 
+                    onClick={() => handleSendMessage('chat')}
+                    className="h-12 w-12 rounded-xl bg-white text-black hover:bg-white/90 shrink-0"
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-[10px] h-7 bg-blue-500/10 text-blue-400 border-blue-500/20"
+                    onClick={() => handleSendMessage('email')}
+                  >
+                    <Mail className="h-3 w-3 mr-1" /> Send as Email
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-[10px] h-7 bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    onClick={() => handleSendMessage('sms')}
+                  >
+                    <MessageCircle className="h-3 w-3 mr-1" /> Send as SMS
+                  </Button>
+                </div>
               </div>
             </div>
           </>
@@ -140,8 +257,8 @@ const Messages = () => {
             <div className="h-20 w-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4">
               <MessageSquare className="h-10 w-10" />
             </div>
-            <p className="text-lg font-bold text-white">Select a chat to start messaging</p>
-            <p className="text-sm">Communicate with your clients in real-time.</p>
+            <p className="text-lg font-bold text-white">Select a contact to start messaging</p>
+            <p className="text-sm">Communicate with your team and clients.</p>
           </div>
         )}
       </div>

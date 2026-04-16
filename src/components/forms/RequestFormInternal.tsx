@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, onSnapshot } from "firebase/firestore";
 import { useState, useEffect } from "react";
 import { ClientSearchSelect } from "../ClientSearchSelect";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,11 +37,21 @@ interface RequestFormProps {
   onCancel?: () => void;
 }
 
-const AVAILABLE_SERVICES = ["Data Strategy", "AI Implementation", "Advanced Analytics", "Custom Dashboards"];
+const DEFAULT_SERVICES = ["Data Strategy", "AI Implementation", "Advanced Analytics", "Custom Dashboards"];
 
 export function RequestFormInternal({ initialData, onSuccess, onCancel }: RequestFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientType, setClientType] = useState<"new" | "existing">(initialData?.clientId ? "existing" : "new");
+  const [availableServices, setAvailableServices] = useState<string[]>(DEFAULT_SERVICES);
+
+  useEffect(() => {
+    // Fetch custom tasks to merge with services
+    const unsub = onSnapshot(collection(db, "customTasks"), (snap) => {
+      const custom = snap.docs.map(doc => doc.data().name);
+      setAvailableServices([...DEFAULT_SERVICES, ...custom]);
+    });
+    return () => unsub();
+  }, []);
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(requestSchema),
@@ -219,7 +229,7 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
         <div className="space-y-2">
           <FormLabel>Services Requested</FormLabel>
           <div className="grid grid-cols-2 gap-2">
-            {AVAILABLE_SERVICES.map((service) => (
+            {availableServices.map((service) => (
               <div 
                 key={service} 
                 className="flex items-center space-x-2 p-2 rounded-lg bg-white/5 border border-white/5 hover:border-white/10 cursor-pointer"

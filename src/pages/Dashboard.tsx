@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   LayoutDashboard, 
   Users, 
@@ -316,7 +323,7 @@ const Sidebar = ({
 );
 
 export default function Dashboard() {
-  const { user, loading } = useContext(AuthContext);
+  const { user, loading, impersonatedUser, setImpersonatedUser } = useContext(AuthContext);
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -324,6 +331,7 @@ export default function Dashboard() {
   const [userRole, setUserRole] = useState<"admin" | "team" | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activities, setActivities] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -333,11 +341,17 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
+    // Fetch team members for impersonation (admin only)
+    const unsubTeam = onSnapshot(collection(db, "users"), (snap) => {
+      setTeamMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     // Fetch or initialize user role
     const userRef = doc(db, "users", user.uid);
     const unsubUser = onSnapshot(userRef, async (snap) => {
       if (snap.exists()) {
-        setUserRole(snap.data().role || "team");
+        const role = impersonatedUser ? impersonatedUser.role : (snap.data().role || "team");
+        setUserRole(role as any);
       } else {
         // First time login - if it's the owner email, make admin
         const role = user.email === "apauloprod@gmail.com" ? "admin" : "team";
@@ -348,7 +362,7 @@ export default function Dashboard() {
           role: role,
           createdAt: serverTimestamp()
         });
-        setUserRole(role);
+        setUserRole(role as any);
       }
     });
 
@@ -359,10 +373,11 @@ export default function Dashboard() {
     });
 
     return () => {
+      unsubTeam();
       unsubUser();
       unsubActivities();
     };
-  }, [user]);
+  }, [user, impersonatedUser]);
 
   const menuItems = useMemo(() => {
     const baseItems = [
@@ -469,6 +484,33 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            {user.email === "apauloprod@gmail.com" && (
+              <Select 
+                value={impersonatedUser?.uid || "original"} 
+                onValueChange={(v) => {
+                  if (v === "original") {
+                    setImpersonatedUser(null);
+                  } else {
+                    const member = teamMembers.find(m => m.id === v);
+                    if (member) {
+                      setImpersonatedUser({ uid: member.id, role: member.role });
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[180px] bg-white/5 border-white/10 rounded-xl h-10 text-xs">
+                  <SelectValue placeholder="Test as Member" />
+                </SelectTrigger>
+                <SelectContent className="bg-black border-white/10">
+                  <SelectItem value="original">Original View (Admin)</SelectItem>
+                  {teamMembers.filter(m => m.id !== user.uid).map(member => (
+                    <SelectItem key={member.id} value={member.id}>
+                      Test as: {member.displayName || member.email.split('@')[0]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button 
               variant="outline" 
               className="hidden md:flex bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20 rounded-xl h-10 gap-2 font-bold"

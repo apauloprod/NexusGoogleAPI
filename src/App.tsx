@@ -9,11 +9,22 @@ import PublicQuoteApproval from "./pages/PublicQuoteApproval";
 import PublicPayment from "./pages/PublicPayment";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-export const AuthContext = createContext<{ user: User | null; loading: boolean }>({ user: null, loading: true });
+export const AuthContext = createContext<{ 
+  user: User | null; 
+  loading: boolean;
+  impersonatedUser: { uid: string; role: string } | null;
+  setImpersonatedUser: (user: { uid: string; role: string } | null) => void;
+}>({ 
+  user: null, 
+  loading: true,
+  impersonatedUser: null,
+  setImpersonatedUser: () => {}
+});
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [impersonatedUser, setImpersonatedUser] = useState<{ uid: string; role: string } | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -26,7 +37,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={{ user, loading }}>
+      <AuthContext.Provider value={{ user, loading, impersonatedUser, setImpersonatedUser }}>
         <Router>
           <Routes>
             <Route path="/" element={<LandingPage />} />

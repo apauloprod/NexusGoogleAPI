@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit, where } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit, where, onSnapshot } from "firebase/firestore";
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 
@@ -56,6 +56,14 @@ interface InvoiceFormProps {
 export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "customTasks"), (snap) => {
+      setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
 
   const form = useForm({
     resolver: zodResolver(invoiceSchema),
@@ -378,7 +386,25 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-4">
                 <div className="flex gap-2 items-start">
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-2">
+                    {customTasks.length > 0 && (
+                      <Select onValueChange={(v) => {
+                        const task = customTasks.find(t => t.id === v);
+                        if (task) {
+                          form.setValue(`items.${index}.description`, task.name);
+                          form.setValue(`items.${index}.unitPrice`, task.defaultPrice);
+                        }
+                      }}>
+                        <SelectTrigger className="bg-white/5 border-white/10 h-8 text-[10px] uppercase">
+                          <SelectValue placeholder="Quick Add Task" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-black border-white/10">
+                          {customTasks.map(task => (
+                            <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                     <FormField
                       control={form.control}
                       name={`items.${index}.description`}
