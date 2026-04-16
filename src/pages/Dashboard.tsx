@@ -86,6 +86,233 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, to, active
   </Link>
 );
 
+const Sidebar = ({ 
+  createDialogOpen, 
+  setCreateDialogOpen, 
+  activeForm, 
+  setActiveForm, 
+  menuItems, 
+  location, 
+  user, 
+  logout 
+}: any) => (
+  <div className="flex flex-col h-full bg-black border-r border-white/5 w-64">
+    <div className="p-6 flex items-center gap-3">
+      <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center">
+        <div className="h-4 w-4 bg-black rounded-sm" />
+      </div>
+      <span className="text-xl font-bold tracking-tighter text-white">NEXUS</span>
+    </div>
+
+    <div className="px-4 mb-6">
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogTrigger asChild>
+          <Button className="w-full bg-white text-black hover:bg-white/90 rounded-xl h-11 gap-2 font-bold">
+            <Plus className="h-5 w-5" />
+            Create New
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold tracking-tighter">
+              {activeForm === "client" ? "Add New Client" : 
+               activeForm === "visit" ? "Schedule New Visit" : 
+               activeForm === "request" ? "Create New Request" : 
+               activeForm === "quote" ? "Create New Quote" :
+               activeForm === "job" ? "Create New Job" :
+               activeForm === "invoice" ? "Create New Invoice" :
+               activeForm === "payment" ? "Record Payment" :
+               "What would you like to create?"}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {!activeForm ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("client")}
+              >
+                <Users className="h-6 w-6" />
+                <span className="text-xs">Client</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("visit")}
+              >
+                <Calendar className="h-6 w-6" />
+                <span className="text-xs">Visit</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("request")}
+              >
+                <FileText className="h-6 w-6" />
+                <span className="text-xs">Request</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("quote")}
+              >
+                <FileText className="h-6 w-6 text-blue-400" />
+                <span className="text-xs">Quote</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("job")}
+              >
+                <CheckSquare className="h-6 w-6 text-emerald-400" />
+                <span className="text-xs">Job</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("invoice")}
+              >
+                <FileText className="h-6 w-6 text-amber-400" />
+                <span className="text-xs">Invoice</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                onClick={() => setActiveForm("payment")}
+              >
+                <CreditCard className="h-6 w-6 text-purple-400" />
+                <span className="text-xs">Payment</span>
+              </Button>
+            </div>
+          ) : (
+            <div className="pt-4">
+              {activeForm === "client" && (
+                <ClientForm 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+              {activeForm === "visit" && (
+                <VisitForm 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+              {activeForm === "request" && (
+                <RequestFormInternal 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+              {activeForm === "quote" && (
+                <QuoteForm 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+              {activeForm === "job" && (
+                <JobForm 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+              {activeForm === "invoice" && (
+                <InvoiceForm 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+              {activeForm === "payment" && (
+                <PaymentForm 
+                  onSuccess={() => {
+                    setCreateDialogOpen(false);
+                    setActiveForm(null);
+                  }} 
+                  onCancel={() => setActiveForm(null)}
+                />
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+
+    <ScrollArea className="flex-1 px-2">
+      <div className="space-y-1">
+        {menuItems.map((item: any) => (
+          <SidebarItem 
+            key={item.to}
+            icon={item.icon}
+            label={item.label}
+            to={item.to}
+            active={location.pathname === item.to}
+          />
+        ))}
+      </div>
+      
+      <Separator className="my-6 bg-white/5 mx-4" />
+      
+      <div className="space-y-1">
+        <SidebarItem 
+          icon={Clock} 
+          label="Timesheets" 
+          to="/dashboard/timesheets" 
+          active={location.pathname === "/dashboard/timesheets"} 
+        />
+        <SidebarItem 
+          icon={Settings} 
+          label="Settings" 
+          to="/dashboard/settings" 
+          active={location.pathname === "/dashboard/settings"} 
+        />
+      </div>
+    </ScrollArea>
+
+    <div className="p-4 border-t border-white/5">
+      <div className="flex items-center gap-3 px-2 mb-4">
+        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+          {user?.photoURL ? (
+            <img src={user.photoURL} alt={user.displayName || ""} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+          ) : (
+            <UserIcon className="h-5 w-5 text-white/50" />
+          )}
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <p className="text-sm font-bold text-white truncate">{user?.displayName || "User"}</p>
+          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+        </div>
+      </div>
+      <Button 
+        variant="ghost" 
+        onClick={logout}
+        className="w-full justify-start gap-3 h-11 px-4 rounded-xl text-muted-foreground hover:text-red-400 hover:bg-red-400/5 transition-colors"
+      >
+        <LogIn className="h-5 w-5 rotate-180" />
+        <span className="font-medium">Log out</span>
+      </Button>
+    </div>
+  </div>
+);
+
 export default function Dashboard() {
   const { user, loading } = useContext(AuthContext);
   const location = useLocation();
@@ -135,6 +362,29 @@ export default function Dashboard() {
     };
   }, [user]);
 
+  const menuItems = useMemo(() => {
+    const baseItems = [
+      { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
+      { icon: Calendar, label: "Schedule", to: "/dashboard/schedule" },
+      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" },
+      { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
+    ];
+
+    if (userRole === "admin") {
+      return [
+        ...baseItems,
+        { icon: Users, label: "Clients", to: "/dashboard/clients" },
+        { icon: FileText, label: "Requests", to: "/dashboard/requests" },
+        { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
+        { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
+        { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
+        { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
+      ];
+    }
+
+    return baseItems;
+  }, [userRole]);
+
   if (loading) {
     return (
       <div className="h-screen w-full bg-black flex items-center justify-center">
@@ -165,252 +415,20 @@ export default function Dashboard() {
     );
   }
 
-  const menuItems = useMemo(() => {
-    const baseItems = [
-      { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
-      { icon: Calendar, label: "Schedule", to: "/dashboard/schedule" },
-      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" },
-      { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
-    ];
-
-    if (userRole === "admin") {
-      return [
-        ...baseItems,
-        { icon: Users, label: "Clients", to: "/dashboard/clients" },
-        { icon: FileText, label: "Requests", to: "/dashboard/requests" },
-        { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
-        { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
-        { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
-        { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
-      ];
-    }
-
-    return baseItems;
-  }, [userRole]);
-
-  const Sidebar = () => (
-    <div className="flex flex-col h-full bg-black border-r border-white/5 w-64">
-      <div className="p-6 flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center">
-          <div className="h-4 w-4 bg-black rounded-sm" />
-        </div>
-        <span className="text-xl font-bold tracking-tighter text-white">NEXUS</span>
-      </div>
-
-      <div className="px-4 mb-6">
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full bg-white text-black hover:bg-white/90 rounded-xl h-11 gap-2 font-bold">
-              <Plus className="h-5 w-5" />
-              Create New
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold tracking-tighter">
-                {activeForm === "client" ? "Add New Client" : 
-                 activeForm === "visit" ? "Schedule New Visit" : 
-                 activeForm === "request" ? "Create New Request" : 
-                 activeForm === "quote" ? "Create New Quote" :
-                 activeForm === "job" ? "Create New Job" :
-                 activeForm === "invoice" ? "Create New Invoice" :
-                 activeForm === "payment" ? "Record Payment" :
-                 "What would you like to create?"}
-              </DialogTitle>
-            </DialogHeader>
-            
-            {!activeForm ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("client")}
-                >
-                  <Users className="h-6 w-6" />
-                  <span className="text-xs">Client</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("visit")}
-                >
-                  <Calendar className="h-6 w-6" />
-                  <span className="text-xs">Visit</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("request")}
-                >
-                  <FileText className="h-6 w-6" />
-                  <span className="text-xs">Request</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("quote")}
-                >
-                  <FileText className="h-6 w-6 text-blue-400" />
-                  <span className="text-xs">Quote</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("job")}
-                >
-                  <CheckSquare className="h-6 w-6 text-emerald-400" />
-                  <span className="text-xs">Job</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("invoice")}
-                >
-                  <FileText className="h-6 w-6 text-amber-400" />
-                  <span className="text-xs">Invoice</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("payment")}
-                >
-                  <CreditCard className="h-6 w-6 text-purple-400" />
-                  <span className="text-xs">Payment</span>
-                </Button>
-              </div>
-            ) : (
-              <div className="pt-4">
-                {activeForm === "client" && (
-                  <ClientForm 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-                {activeForm === "visit" && (
-                  <VisitForm 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-                {activeForm === "request" && (
-                  <RequestFormInternal 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-                {activeForm === "quote" && (
-                  <QuoteForm 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-                {activeForm === "job" && (
-                  <JobForm 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-                {activeForm === "invoice" && (
-                  <InvoiceForm 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-                {activeForm === "payment" && (
-                  <PaymentForm 
-                    onSuccess={() => {
-                      setCreateDialogOpen(false);
-                      setActiveForm(null);
-                    }} 
-                    onCancel={() => setActiveForm(null)}
-                  />
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <ScrollArea className="flex-1 px-2">
-        <div className="space-y-1">
-          {menuItems.map((item) => (
-            <SidebarItem 
-              key={item.to}
-              icon={item.icon}
-              label={item.label}
-              to={item.to}
-              active={location.pathname === item.to}
-            />
-          ))}
-        </div>
-        
-        <Separator className="my-6 bg-white/5 mx-4" />
-        
-        <div className="space-y-1">
-          <SidebarItem 
-            icon={Clock} 
-            label="Timesheets" 
-            to="/dashboard/timesheets" 
-            active={location.pathname === "/dashboard/timesheets"} 
-          />
-          <SidebarItem 
-            icon={Settings} 
-            label="Settings" 
-            to="/dashboard/settings" 
-            active={location.pathname === "/dashboard/settings"} 
-          />
-        </div>
-      </ScrollArea>
-
-      <div className="p-4 border-t border-white/5">
-        <div className="flex items-center gap-3 px-2 mb-4">
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-            {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName || ""} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-            ) : (
-              <UserIcon className="h-5 w-5 text-white/50" />
-            )}
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-bold text-white truncate">{user?.displayName || "User"}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-          </div>
-        </div>
-        <Button 
-          variant="ghost" 
-          onClick={logout}
-          className="w-full justify-start gap-3 h-11 px-4 rounded-xl text-muted-foreground hover:text-red-400 hover:bg-red-400/5 transition-colors"
-        >
-          <LogIn className="h-5 w-5 rotate-180" />
-          <span className="font-medium">Log out</span>
-        </Button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden">
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
-        <Sidebar />
+        <Sidebar 
+          createDialogOpen={createDialogOpen}
+          setCreateDialogOpen={setCreateDialogOpen}
+          activeForm={activeForm}
+          setActiveForm={setActiveForm}
+          menuItems={menuItems}
+          location={location}
+          user={user}
+          logout={logout}
+        />
       </div>
 
       {/* Main Content */}
@@ -425,7 +443,16 @@ export default function Dashboard() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-black border-r border-white/5">
-                <Sidebar />
+                <Sidebar 
+                  createDialogOpen={createDialogOpen}
+                  setCreateDialogOpen={setCreateDialogOpen}
+                  activeForm={activeForm}
+                  setActiveForm={setActiveForm}
+                  menuItems={menuItems}
+                  location={location}
+                  user={user}
+                  logout={logout}
+                />
               </SheetContent>
             </Sheet>
             
