@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, limit } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, limit, where } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -102,6 +102,21 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
   const watchItems = form.watch("items");
   const total = watchItems?.reduce((sum, item) => sum + (Number(item.price) || 0), 0) || 0;
 
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      // Find the admin user (apauloprod@gmail.com)
+      // In a real app, we'd have a specific settings doc, but here we use the admin user doc
+      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      }
+    };
+    fetchBusinessSettings();
+  }, []);
+
   async function onSubmit(values: QuoteFormValues) {
     setIsSubmitting(true);
     try {
@@ -113,6 +128,9 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         ...values,
         clientName,
         total,
+        businessName: businessSettings?.businessName || "",
+        businessDetails: businessSettings?.businessDetails || "",
+        businessLogo: businessSettings?.businessLogo || "",
         updatedAt: serverTimestamp(),
       };
 

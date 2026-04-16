@@ -89,7 +89,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
     match /timesheets/{timesheetId} {
-      allow read, write: if isStaff();
+      allow read: if isStaff() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isStaff() && request.resource.data.userId == request.auth.uid;
+      allow update: if isStaff() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
     }
 
     // Users: Admin can manage, users can read their own

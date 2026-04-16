@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit, where } from "firebase/firestore";
 import { useState, useEffect } from "react";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -101,6 +101,19 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
     form.setValue("total", total);
   }, [watchItems, form]);
 
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      }
+    };
+    fetchBusinessSettings();
+  }, []);
+
   async function onSubmit(values: InvoiceFormValues) {
     setIsSubmitting(true);
     setEmailError(null);
@@ -115,6 +128,9 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
       const firestoreData = {
         ...values,
         clientName,
+        businessName: businessSettings?.businessName || "",
+        businessDetails: businessSettings?.businessDetails || "",
+        businessLogo: businessSettings?.businessLogo || "",
         dueDate: new Date(values.dueDate),
         updatedAt: serverTimestamp(),
       };
@@ -123,6 +139,9 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
       const apiData = {
         ...values,
         clientName,
+        businessName: businessSettings?.businessName || "",
+        businessDetails: businessSettings?.businessDetails || "",
+        businessLogo: businessSettings?.businessLogo || "",
         dueDate: values.dueDate, // Keep as string for API
       };
 

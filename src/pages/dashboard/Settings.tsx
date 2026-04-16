@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
   Settings as SettingsIcon,
   User,
@@ -13,32 +13,75 @@ import {
   Mail,
   Trash2,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  DollarSign,
+  Building2,
+  Image as ImageIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
-
-
+import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { AuthContext } from "../../App";
 
 const Settings = () => {
+  const { user } = useContext(AuthContext);
   const [isSeeding, setIsSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberName, setNewMemberName] = useState("");
+  const [businessData, setBusinessData] = useState({
+    businessName: "",
+    businessDetails: "",
+    businessLogo: "",
+    hourlyRate: 0
+  });
 
   useEffect(() => {
+    if (!user) return;
+
+    // Fetch business data
+    const unsubBusiness = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setBusinessData({
+          businessName: data.businessName || "",
+          businessDetails: data.businessDetails || "",
+          businessLogo: data.businessLogo || "",
+          hourlyRate: data.hourlyRate || 0
+        });
+      }
+    });
+
+    // Fetch team members
     const q = query(collection(db, "users"));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsubTeam = onSnapshot(q, (snap) => {
       setTeamMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsub();
-  }, []);
+
+    return () => {
+      unsubBusiness();
+      unsubTeam();
+    };
+  }, [user]);
+
+  const handleSaveBusiness = async () => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        ...businessData,
+        updatedAt: serverTimestamp()
+      });
+      alert("Settings saved successfully!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, "users");
+    }
+  };
 
   const addTeamMember = async () => {
     if (!newMemberEmail || !newMemberName) return;
@@ -47,12 +90,21 @@ const Settings = () => {
         email: newMemberEmail,
         displayName: newMemberName,
         role: "team",
+        hourlyRate: 25, // Default rate
         createdAt: serverTimestamp()
       });
       setNewMemberEmail("");
       setNewMemberName("");
     } catch (error) {
       console.error("Error adding team member:", error);
+    }
+  };
+
+  const updateMemberRate = async (userId: string, rate: number) => {
+    try {
+      await updateDoc(doc(db, "users", userId), { hourlyRate: rate });
+    } catch (error) {
+      console.error("Error updating rate:", error);
     }
   };
 
@@ -176,10 +228,8 @@ const Settings = () => {
         {/* Sidebar Nav */}
         <div className="space-y-1">
           {[
-            { id: "profile", icon: User, label: "Profile" },
+            { id: "profile", icon: Building2, label: "Business Profile" },
             { id: "team", icon: Users, label: "Team Management" },
-            { id: "notifications", icon: Bell, label: "Notifications" },
-            { id: "security", icon: Lock, label: "Security" },
             { id: "data", icon: Database, label: "Data & Backup" },
           ].map((item) => (
             <Button 
@@ -202,27 +252,65 @@ const Settings = () => {
             <section>
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                  <User className="h-5 w-5 text-white" />
+                  <Building2 className="h-5 w-5 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold">Business Profile</h2>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label>Business Name</Label>
-                  <Input defaultValue="Nexus Analytics" className="bg-white/5 border-white/10 rounded-xl h-12" />
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label>Business Name</Label>
+                    <Input 
+                      value={businessData.businessName}
+                      onChange={e => setBusinessData({...businessData, businessName: e.target.value})}
+                      placeholder="Nexus Analytics" 
+                      className="bg-white/5 border-white/10 rounded-xl h-12" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Hourly Rate ($/hr)</Label>
+                    <Input 
+                      type="number"
+                      value={businessData.hourlyRate}
+                      onChange={e => setBusinessData({...businessData, hourlyRate: parseFloat(e.target.value)})}
+                      className="bg-white/5 border-white/10 rounded-xl h-12" 
+                    />
+                  </div>
                 </div>
+                
                 <div className="space-y-2">
-                  <Label>Contact Email</Label>
-                  <Input defaultValue="owner@nexus.com" className="bg-white/5 border-white/10 rounded-xl h-12" />
+                  <Label>Business Logo URL</Label>
+                  <div className="flex gap-4">
+                    <Input 
+                      value={businessData.businessLogo}
+                      onChange={e => setBusinessData({...businessData, businessLogo: e.target.value})}
+                      placeholder="https://example.com/logo.png" 
+                      className="bg-white/5 border-white/10 rounded-xl h-12 flex-1" 
+                    />
+                    {businessData.businessLogo && (
+                      <div className="h-12 w-12 rounded-xl border border-white/10 overflow-hidden bg-white/5">
+                        <img src={businessData.businessLogo} alt="Logo Preview" className="h-full w-full object-contain" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="sm:col-span-2 space-y-2">
-                  <Label>Business Address</Label>
-                  <Input defaultValue="123 Data Drive, Tech City, TC 12345" className="bg-white/5 border-white/10 rounded-xl h-12" />
+
+                <div className="space-y-2">
+                  <Label>Business Details / Address</Label>
+                  <Textarea 
+                    value={businessData.businessDetails}
+                    onChange={e => setBusinessData({...businessData, businessDetails: e.target.value})}
+                    placeholder="Enter your business address and contact details..."
+                    className="bg-white/5 border-white/10 rounded-xl min-h-[100px]" 
+                  />
                 </div>
               </div>
               
-              <Button className="mt-8 bg-white text-black hover:bg-white/90 rounded-xl px-8 h-12 font-bold">
+              <Button 
+                onClick={handleSaveBusiness}
+                className="mt-8 bg-white text-black hover:bg-white/90 rounded-xl px-8 h-12 font-bold"
+              >
                 Save Changes
               </Button>
             </section>
@@ -290,9 +378,21 @@ const Settings = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <Badge className={member.role === 'admin' ? "bg-purple-500/10 text-purple-500" : "bg-blue-500/10 text-blue-500"}>
-                            {member.role === 'admin' ? 'Admin' : 'Team Member'}
-                          </Badge>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={member.role === 'admin' ? "bg-purple-500/10 text-purple-500" : "bg-blue-500/10 text-blue-500"}>
+                              {member.role === 'admin' ? 'Admin' : 'Team Member'}
+                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3 text-emerald-400" />
+                              <Input 
+                                type="number"
+                                value={member.hourlyRate || 0}
+                                onChange={e => updateMemberRate(member.id, parseFloat(e.target.value))}
+                                className="h-6 w-16 bg-transparent border-none text-xs font-bold text-emerald-400 p-0 text-right focus-visible:ring-0"
+                              />
+                              <span className="text-[10px] text-muted-foreground">/hr</span>
+                            </div>
+                          </div>
                           <div className="flex items-center gap-2">
                             <Button 
                               variant="ghost" 
@@ -330,45 +430,6 @@ const Settings = () => {
               </div>
               
               <div className="glass p-8 rounded-3xl border-white/5 space-y-8">
-                <div>
-                  <h3 className="text-lg font-bold mb-2 text-white">Email Service (Resend)</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Test if your backend API and Resend integration are working correctly.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <Button 
-                      variant="outline" 
-                      className="rounded-xl border-white/10 hover:bg-white/5"
-                      onClick={async () => {
-                        try {
-                          const res = await fetch(`/api/health`);
-                          const data = await res.json();
-                          alert(`API Status: ${data.status}\nEnvironment: ${data.env}`);
-                        } catch (err) {
-                          alert("Failed to connect to API. Check your VITE_API_URL or server status.");
-                        }
-                      }}
-                    >
-                      Test API Health
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="rounded-xl border-white/10 hover:bg-white/5"
-                      onClick={async () => {
-                        try {
-                          const res = await fetch(`/api/send-quote`);
-                          const data = await res.json();
-                          alert(`API Route Check: ${data.message}`);
-                        } catch (err) {
-                          alert("API Route /api/send-quote not found (404).");
-                        }
-                      }}
-                    >
-                      Test Quote Route
-                    </Button>
-                  </div>
-                </div>
-
                 <div className="pt-8 border-t border-white/5">
                   <h3 className="text-lg font-bold mb-2 text-white">Seed Sample Data</h3>
                   <p className="text-sm text-muted-foreground mb-6">

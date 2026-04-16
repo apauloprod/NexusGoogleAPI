@@ -102,10 +102,11 @@
         "description": { "type": "string" },
         "amount": { "type": "number" },
         "category": { "type": "string" },
+        "type": { "type": "string", "enum": ["one-time", "monthly"] },
         "date": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["description", "amount", "date"]
+      "required": ["description", "amount", "date", "type"]
     },
     "Timesheet": {
       "title": "Timesheet",
@@ -121,9 +122,26 @@
         "duration": { "type": "number" },
         "rate": { "type": "number" },
         "totalCost": { "type": "number" },
-        "status": { "type": "string", "enum": ["active", "completed"] }
+        "status": { "type": "string", "enum": ["active", "completed"] },
+        "submissionStatus": { "type": "string", "enum": ["draft", "submitted", "approved"] },
+        "submissionType": { "type": "string", "enum": ["daily", "weekly"] }
       },
       "required": ["userId", "startTime", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "team"] },
+        "hourlyRate": { "type": "number" },
+        "businessName": { "type": "string" },
+        "businessDetails": { "type": "string" },
+        "businessLogo": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -133,6 +151,7 @@
     "/invoices/{invoiceId}": { "schema": "Invoice", "description": "Invoices" },
     "/clients/{clientId}": { "schema": "Client", "description": "Customer records" },
     "/expenses/{expenseId}": { "schema": "Expense", "description": "Business expenses" },
-    "/timesheets/{timesheetId}": { "schema": "Timesheet", "description": "Employee timesheets" }
+    "/timesheets/{timesheetId}": { "schema": "Timesheet", "description": "Employee timesheets" },
+    "/users/{userId}": { "schema": "User", "description": "User profiles" }
   }
 }
