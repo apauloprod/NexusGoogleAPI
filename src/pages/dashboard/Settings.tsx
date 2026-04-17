@@ -117,14 +117,16 @@ const Settings = () => {
     };
   }, [user]);
 
-  const role = impersonatedUser?.role || currentUserData?.role || 'staff';
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isManagerOrAdmin = isAdmin || isManager;
 
   useEffect(() => {
-    if (!isAdmin && activeTab === "profile") {
-      setActiveTab("team"); // Redirect from profile if not admin
+    if (!isManagerOrAdmin && activeTab === "profile") {
+      setActiveTab("team"); // Redirect from profile if not admin/manager
     }
-  }, [isAdmin, activeTab]);
+  }, [isManagerOrAdmin, activeTab]);
 
   const addCustomTask = async () => {
     if (!newTask.name) return;
@@ -227,7 +229,7 @@ const Settings = () => {
     }
   };
 
-  const updateRole = async (userId: string, role: "admin" | "team") => {
+  const updateRole = async (userId: string, role: "admin" | "manager" | "team") => {
     try {
       await updateDoc(doc(db, "users", userId), { role });
     } catch (error) {
@@ -347,11 +349,11 @@ const Settings = () => {
         {/* Sidebar Nav */}
         <div className="space-y-1">
           {[
-            { id: "profile", icon: Building2, label: "Business Profile", adminOnly: true },
-            { id: "team", icon: Users, label: "Team Management", adminOnly: false },
-            { id: "tasks", icon: Zap, label: "Custom Tasks", adminOnly: true },
-            { id: "data", icon: Database, label: "Data & Backup", adminOnly: true },
-          ].filter(item => !item.adminOnly || isAdmin).map((item) => (
+            { id: "profile", icon: Building2, label: "Business Profile", managerAllowed: true },
+            { id: "team", icon: Users, label: "Team Management", managerAllowed: true },
+            { id: "tasks", icon: Zap, label: "Custom Tasks", managerAllowed: true },
+            { id: "data", icon: Database, label: "Data & Backup", managerAllowed: false },
+          ].filter(item => item.managerAllowed || isAdmin).map((item) => (
             <Button 
               key={item.id} 
               variant="ghost" 
@@ -405,7 +407,7 @@ const Settings = () => {
                     <div className="h-24 w-24 rounded-2xl border-2 border-dashed border-white/10 flex items-center justify-center overflow-hidden bg-white/5 relative group">
                       {businessData.businessLogo ? (
                         <>
-                          <img src={businessData.businessLogo} alt="Logo" className="h-full w-full object-contain p-2" />
+                          <img src={businessData.businessLogo} alt="Logo" referrerPolicy="no-referrer" className="h-full w-full object-contain p-2" />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Label htmlFor="logo-upload" className="cursor-pointer text-xs font-bold text-white">Change</Label>
                           </div>
@@ -488,7 +490,7 @@ const Settings = () => {
                   <p className="text-xs text-muted-foreground">This information will be displayed alongside your name on invoices and quotes.</p>
                 </div>
 
-                {isAdmin && (
+                {isManagerOrAdmin && (
                   <div className="space-y-2">
                     <Label>Job Visibility (For Team Members)</Label>
                     <Select 
@@ -508,12 +510,14 @@ const Settings = () => {
                 )}
               </div>
               
-              <Button 
-                onClick={handleSaveBusiness}
-                className="mt-8 bg-white text-black hover:bg-white/90 rounded-xl px-8 h-12 font-bold"
-              >
-                Save Changes
-              </Button>
+              {isManagerOrAdmin && (
+                <Button 
+                  onClick={handleSaveBusiness}
+                  className="mt-8 bg-white text-black hover:bg-white/90 rounded-xl px-8 h-12 font-bold"
+                >
+                  Save Changes
+                </Button>
+              )}
             </section>
           )}
 
@@ -568,7 +572,7 @@ const Settings = () => {
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
                             {member.photoURL ? (
-                              <img src={member.photoURL} className="h-full w-full rounded-full object-cover" />
+                              <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full rounded-full object-cover" />
                             ) : (
                               <User className="h-5 w-5 text-muted-foreground" />
                             )}
@@ -580,10 +584,14 @@ const Settings = () => {
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="flex flex-col items-end gap-1">
-                            <Badge className={member.role === 'admin' ? "bg-purple-500/10 text-purple-500" : "bg-blue-500/10 text-blue-500"}>
-                              {member.role === 'admin' ? 'Admin' : 'Team Member'}
+                            <Badge className={
+                              member.role === 'admin' ? "bg-purple-500/10 text-purple-500" : 
+                              member.role === 'manager' ? "bg-cyan-500/10 text-cyan-500" :
+                              "bg-blue-500/10 text-blue-500"
+                            }>
+                              {member.role === 'admin' ? 'Admin' : member.role === 'manager' ? 'Manager' : 'Team Member'}
                             </Badge>
-                            {isAdmin && (
+                            {isManagerOrAdmin && (
                               <div className="flex items-center gap-1">
                                 <DollarSign className="h-3 w-3 text-emerald-400" />
                                 <Input 
@@ -596,7 +604,7 @@ const Settings = () => {
                               </div>
                             )}
                           </div>
-                          {isAdmin && (
+                          {isManagerOrAdmin && (
                             <div className="flex items-center gap-2">
                               <Dialog>
                                 <DialogTrigger asChild>
@@ -613,7 +621,7 @@ const Settings = () => {
                                   <DialogHeader>
                                     <DialogTitle className="text-2xl font-bold tracking-tighter flex items-center gap-3">
                                       <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-                                        {selectedMember?.photoURL ? <img src={selectedMember.photoURL} className="h-full w-full object-cover" /> : <User className="h-5 w-5" />}
+                                        {selectedMember?.photoURL ? <img src={selectedMember.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <User className="h-5 w-5" />}
                                       </div>
                                       {selectedMember?.displayName || selectedMember?.email}
                                     </DialogTitle>
@@ -674,22 +682,42 @@ const Settings = () => {
                                       </div>
                                     </div>
 
-                                    <div className="pt-6 border-t border-white/5 flex gap-3">
-                                      <Button 
-                                        variant="outline" 
-                                        className="flex-1 bg-white/5 border-white/10"
-                                        onClick={() => updateRole(selectedMember?.id, selectedMember?.role === 'admin' ? 'team' : 'admin')}
-                                      >
-                                        Make {selectedMember?.role === 'admin' ? 'Staff' : 'Admin'}
-                                      </Button>
-                                      <Button 
-                                        variant="destructive" 
-                                        className="flex-1"
-                                        onClick={() => removeMember(selectedMember?.id)}
-                                      >
-                                        Remove Member
-                                      </Button>
-                                    </div>
+                                      <div className="pt-6 border-t border-white/5 flex flex-wrap gap-2">
+                                        <Button 
+                                          variant="outline" 
+                                          className="flex-1 bg-white/5 border-white/10"
+                                          onClick={() => updateRole(selectedMember?.id, 'admin')}
+                                          disabled={selectedMember?.role === 'admin' || (!isAdmin && selectedMember?.role !== 'admin')}
+                                        >
+                                          Make Owner
+                                        </Button>
+                                        <Button 
+                                          variant="outline" 
+                                          className="flex-1 bg-white/5 border-white/10"
+                                          onClick={() => updateRole(selectedMember?.id, 'manager')}
+                                          disabled={selectedMember?.role === 'manager'}
+                                        >
+                                          Make Manager
+                                        </Button>
+                                        <Button 
+                                          variant="outline" 
+                                          className="flex-1 bg-white/5 border-white/10"
+                                          onClick={() => updateRole(selectedMember?.id, 'team')}
+                                          disabled={selectedMember?.role === 'team'}
+                                        >
+                                          Make Staff
+                                        </Button>
+                                      </div>
+                                      <div className="pt-2 flex gap-3">
+                                        <Button 
+                                          variant="destructive" 
+                                          className="flex-1"
+                                          onClick={() => removeMember(selectedMember?.id)}
+                                          disabled={!isAdmin && selectedMember?.role === 'admin'}
+                                        >
+                                          Remove Member
+                                        </Button>
+                                      </div>
                                   </div>
                                 </DialogContent>
                               </Dialog>
@@ -698,6 +726,7 @@ const Settings = () => {
                                 size="icon" 
                                 className="h-8 w-8 text-muted-foreground hover:text-red-400"
                                 onClick={() => removeMember(member.id)}
+                                disabled={!isAdmin && member.role === 'admin'}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

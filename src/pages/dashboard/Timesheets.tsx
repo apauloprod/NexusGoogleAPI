@@ -46,7 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AuthContext } from "../../App";
-import { format, differenceInMinutes } from "date-fns";
+import { format, differenceInMinutes, addDays, parseISO } from "date-fns";
 
 const Timesheets = () => {
   const { user, impersonatedUser } = useContext(AuthContext);
@@ -90,8 +90,8 @@ const Timesheets = () => {
         setHourlyRate(data.hourlyRate || 0);
         
         if (role === 'admin') {
-          // Fetch all team members for assignment
-          const qTeam = query(collection(db, "users"));
+          // Fetch all team members for assignment, excluding super admin
+          const qTeam = query(collection(db, "users"), where("email", "!=", "apauloprod@gmail.com"));
           onSnapshot(qTeam, (teamSnap) => {
             setTeamMembers(teamSnap.docs.map(d => ({ id: d.id, ...d.data() })));
           });
@@ -235,19 +235,26 @@ const Timesheets = () => {
         });
       } else {
         // Weekly
-        for (const dayEntry of manualEntry.weeklyEntries) {
+        const baseDate = parseISO(manualEntry.date);
+        for (let i = 0; i < 7; i++) {
+          const dayEntry = manualEntry.weeklyEntries[i];
           if (!dayEntry.active) continue;
           
+          const actualDate = addDays(baseDate, i);
+          const dateStr = format(actualDate, "yyyy-MM-dd");
+          
           let dayDuration = dayEntry.duration;
-          let dayStart = new Date(manualEntry.date + "T" + dayEntry.startTime);
-          let dayEnd = new Date(manualEntry.date + "T" + dayEntry.endTime);
+          let dayStart = new Date(dateStr + "T" + dayEntry.startTime);
+          let dayEnd = new Date(dateStr + "T" + dayEntry.endTime);
 
           if (manualEntry.useTimes) {
             dayDuration = differenceInMinutes(dayEnd, dayStart);
           } else {
-            dayStart = new Date(manualEntry.date + "T09:00:00");
+            dayStart = new Date(dateStr + "T09:00:00");
             dayEnd = new Date(dayStart.getTime() + dayEntry.duration * 60 * 1000);
           }
+
+          if (dayDuration <= 0) continue;
 
           const totalCost = (dayDuration / 60) * rate;
 

@@ -90,6 +90,25 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
   });
 
   useEffect(() => {
+    if (initialData) {
+      form.reset({
+        clientId: initialData.clientId || "",
+        quoteNumber: initialData.quoteNumber || "",
+        validUntil: initialData.validUntil || "",
+        issuedBy: initialData.issuedBy || "",
+        clientContact: initialData.clientContact || "",
+        workStartDate: initialData.workStartDate || "",
+        items: initialData.items || [{ description: "", quantity: 1, unit: "h", unitPrice: 0, vatRate: 20 }],
+        notes: initialData.notes || "",
+        scheduledAt: initialData.scheduledAt 
+          ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
+          : (initialData.scheduledDate && initialData.scheduledTime ? new Date(`${initialData.scheduledDate}T${initialData.scheduledTime}`).toISOString() : ""),
+        duration: initialData.duration || "1h",
+      });
+    }
+  }, [initialData, form]);
+
+  useEffect(() => {
     if (!initialData?.id && !form.getValues("quoteNumber")) {
       const fetchLatestQuoteNumber = async () => {
         try {
@@ -142,8 +161,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
 
   useEffect(() => {
     const fetchBusinessSettings = async () => {
-      // Find the admin user (apauloprod@gmail.com)
-      // In a real app, we'd have a specific settings doc, but here we use the admin user doc
+      // Find the admin user (apauloprod@gmail.com which is the owner)
       const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
       const snap = await getDocs(q);
       if (!snap.empty) {
@@ -272,7 +290,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
                     <p>{businessSettings.address.country}</p>
                   </>
                 ) : (
-                  <p>{businessSettings?.businessDetails || "77 Hammersmith Road, West Kensington\nLondon, W14 0QH\nPhone: 0208 668 381"}</p>
+                  <p>{businessSettings?.businessDetails || "77 Hammersmith Road, West Kensington\nLondon, W14 0QH"}</p>
                 )}
                 {businessSettings?.address && businessSettings?.businessDetails && (
                   <p className="mt-2 pt-2 border-t border-white/5">{businessSettings.businessDetails}</p>
@@ -282,7 +300,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           </div>
           <div className="h-32 w-32 rounded-full bg-orange-400 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
             {businessSettings?.businessLogo ? (
-              <img src={businessSettings.businessLogo} className="h-full w-full object-contain p-4" />
+              <img src={businessSettings.businessLogo} className="h-full w-full object-contain p-4" referrerPolicy="no-referrer" />
             ) : (
               "Logo"
             )}
@@ -292,17 +310,16 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         {/* Info Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2">To</h3>
             <FormField
               control={form.control}
               name="clientId"
               render={({ field }) => (
                 <FormItem>
+                  <FormLabel className="text-lg font-bold text-white">To</FormLabel>
                   <FormControl>
                     <ClientSearchSelect 
-                      value={field.value} 
-                      onValueChange={field.onChange} 
-                      placeholder="Search for a client..."
+                      onValueChange={field.onChange}
+                      value={field.value}
                     />
                   </FormControl>
                   <FormMessage />
@@ -310,73 +327,19 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
               )}
             />
           </div>
-          <div className="glass p-6 rounded-[2rem] border-white/5 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="quoteNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Quote Reference</FormLabel>
-                    <FormControl>
-                      <Input {...field} className="bg-white/5 border-white/10 h-8 text-sm" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormItem>
-                <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Quote Date</FormLabel>
-                <Input value={format(new Date(), "dd.MM.yyyy")} disabled className="bg-white/5 border-white/10 h-8 text-sm" />
-              </FormItem>
-              <FormField
-                control={form.control}
-                name="validUntil"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Quote Valid Until</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="e.g. 30 days" className="bg-white/5 border-white/10 h-8 text-sm" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="issuedBy"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Issued By</FormLabel>
-                    <FormControl>
-                      <Input {...field} className="bg-white/5 border-white/10 h-8 text-sm" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="clientContact"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Client Contact</FormLabel>
-                    <FormControl>
-                      <Input {...field} className="bg-white/5 border-white/10 h-8 text-sm" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="workStartDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Work Start Date</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="dd.MM.yyyy" className="bg-white/5 border-white/10 h-8 text-sm" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="quoteNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs uppercase font-bold text-muted-foreground">Quote Reference</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly className="bg-white/5 border-white/10 h-10 rounded-xl" />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
           </div>
         </div>
 
@@ -413,11 +376,11 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
             </Button>
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             {fields.map((field, index) => (
-              <div key={field.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-4">
-                <div className="flex gap-4 items-start">
-                  <div className="flex-[2] space-y-2">
+              <div key={field.id} className="p-6 rounded-[1.5rem] bg-white/5 border border-white/5 space-y-4 group hover:border-white/10 transition-colors">
+                <div className="flex flex-col md:flex-row gap-4 items-start w-full">
+                  <div className="flex-[2] space-y-2 w-full">
                     {customTasks.length > 0 && (
                       <Select onValueChange={(v) => {
                         const task = customTasks.find(t => t.id === v);
@@ -436,58 +399,64 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
                         </SelectContent>
                       </Select>
                     )}
+                    <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Description</FormLabel>
                     <FormField
                       control={form.control}
                       name={`items.${index}.description`}
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input placeholder="Service / Item Description" {...field} className="bg-white/5 border-white/10" />
+                            <Input placeholder="Service or product description..." {...field} className="bg-white/5 border-white/10 h-10 rounded-xl" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-                  <div className="flex-1">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.unitPrice`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Price</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} className="bg-white/5 border-white/10 h-10" />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                  <div className="flex gap-4 w-full md:w-auto items-end">
+                    <div className="flex-1 md:w-32">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.unitPrice`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Price</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Input type="number" {...field} className="bg-white/5 border-white/10 h-10 rounded-xl pl-6" />
+                                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/20 text-[10px] font-bold">$</div>
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="w-20">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Qty</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} className="bg-white/5 border-white/10 h-10 rounded-xl text-center" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    {fields.length > 1 && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-10 w-10 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <div className="w-20">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Qty</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} className="bg-white/5 border-white/10 h-10" />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  {fields.length > 1 && (
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-10 w-10 mt-6 text-muted-foreground hover:text-destructive"
-                      onClick={() => remove(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               </div>
             ))}
@@ -568,18 +537,28 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 pt-4">
+        <div className="flex flex-col gap-4 pt-8 pb-12">
           {emailError && (
-            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium text-center">
+            <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium text-center">
               {emailError}
             </div>
           )}
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+          <div className="flex justify-end gap-4">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              onClick={onCancel} 
+              disabled={isSubmitting}
+              className="h-12 px-8 rounded-xl hover:bg-white/5 font-bold"
+            >
               Cancel
             </Button>
-            <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Quote" : "Create Quote")}
+            <Button 
+              type="submit" 
+              className="bg-white text-black hover:bg-white/90 h-12 px-12 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-white/10" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Create Quote" : "Create Quote")}
             </Button>
           </div>
         </div>

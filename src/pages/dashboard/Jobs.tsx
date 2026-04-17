@@ -182,7 +182,8 @@ const Jobs = () => {
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = job.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           job.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          job.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+                          job.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          job.id?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || job.status === statusFilter;
     
     if (!matchesSearch || !matchesStatus) return false;
@@ -218,7 +219,7 @@ const Jobs = () => {
               New Job
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Job</DialogTitle>
             </DialogHeader>
@@ -304,35 +305,54 @@ const Jobs = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg">{job.title}</h3>
+                    <h3 className="font-bold text-lg">
+                      {job.items?.[0]?.description ? `${job.items[0].description}${job.items.length > 1 ? ` (+${job.items.length - 1} more)` : ''} - ` : ''}
+                      {job.clientName}
+                    </h3>
                     {getStatusBadge(job.status)}
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" /> {job.clientName}</span>
-                    <span className="flex items-center gap-1">
+                  <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1 font-medium">
                       <Clock className="h-3 w-3" /> 
                       {job.scheduledAt ? job.scheduledAt.toDate().toLocaleString() : "Unscheduled"}
                     </span>
+                    {job.location && (
+                      <a 
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+                      >
+                        <ArrowUpRight className="h-3 w-3" />
+                        {job.location}
+                      </a>
+                    )}
                   </div>
                   {job.quoteNumber && (
-                    <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                      Quote: 
-                      <Link to={`/dashboard/quotes?search=${job.quoteNumber}`} className="text-cyan-400 hover:underline font-medium">
-                        {job.quoteNumber}
-                      </Link>
+                    <div className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
+                      Quote reference: 
+                      {(impersonatedUser?.role || currentUserData?.role) === 'admin' ? (
+                        <Link to={`/dashboard/quotes?search=${job.quoteNumber}`} className="text-cyan-400 hover:underline font-medium">
+                          {job.quoteNumber}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{job.quoteNumber}</span>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-6">
-                <div className="text-right">
-                  <p className="text-lg font-bold text-white">
-                    ${job.total?.toLocaleString() || "0.00"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {job.items?.length || 0} items
-                  </p>
-                </div>
+                {(impersonatedUser?.role || currentUserData?.role) === 'admin' && (
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-white">
+                      ${job.total?.toLocaleString() || "0.00"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {job.items?.length || 0} items
+                    </p>
+                  </div>
+                )}
                 <div className="h-8 w-px bg-white/5 mx-2" />
                 <div className="flex items-center gap-2">
                   {job.status !== 'completed' && (

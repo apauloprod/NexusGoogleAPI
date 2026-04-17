@@ -130,8 +130,8 @@ const Schedule = () => {
     
     let isVisible = false;
     if (viewMode === 'timeline') {
-      const sw = startOfWeek(currentDate);
-      const ew = endOfWeek(currentDate);
+      const sw = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const ew = endOfWeek(currentDate, { weekStartsOn: 1 });
       isVisible = date >= sw && date <= ew;
     } else {
       isVisible = date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear();
@@ -153,7 +153,10 @@ const Schedule = () => {
   });
 
   const visibleDays = viewMode === 'timeline'
-    ? eachDayOfInterval({ start: startOfWeek(currentDate), end: endOfWeek(currentDate) })
+    ? eachDayOfInterval({ 
+        start: startOfWeek(currentDate, { weekStartsOn: 1 }), 
+        end: endOfWeek(currentDate, { weekStartsOn: 1 }) 
+      })
     : eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) });
 
   const groupedVisits = filteredVisits.reduce((acc, item) => {
@@ -221,7 +224,7 @@ const Schedule = () => {
                 New Visit
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold tracking-tighter">Schedule New Visit</DialogTitle>
               </DialogHeader>
@@ -237,7 +240,7 @@ const Schedule = () => {
       </div>
 
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tighter">
               Edit {editingItem?.type === 'job' ? 'Job' : 'Visit'}

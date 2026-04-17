@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   TrendingUp,
   DollarSign,
-  Edit2
+  Edit2,
+  Search,
+  Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +26,9 @@ import {
 } from "@/components/ui/dialog";
 import { PaymentForm } from "../../components/forms/PaymentForm";
 
-import { useSearchParams } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { useSearchParams, Link } from "react-router-dom";
 
 const Payments = () => {
   const [searchParams] = useSearchParams();
@@ -33,6 +37,14 @@ const Payments = () => {
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+
+  useEffect(() => {
+    const search = searchParams.get("search");
+    if (search) {
+      setSearchTerm(search);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const q = query(collection(db, "payments"), orderBy("createdAt", "desc"));
@@ -45,6 +57,11 @@ const Payments = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  const filteredPayments = payments.filter(payment => {
+    return payment.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           payment.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div className="p-8">
@@ -91,6 +108,18 @@ const Payments = () => {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search by client name or invoice number..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-white/5 border-white/10"
+          />
+        </div>
+      </div>
+
       <Dialog open={!!editingPayment} onOpenChange={(open) => !open && setEditingPayment(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
           <DialogHeader>
@@ -111,10 +140,10 @@ const Payments = () => {
       <div className="grid gap-4">
         {loading ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">Loading payments...</div>
-        ) : payments.length === 0 ? (
+        ) : filteredPayments.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No payments recorded yet.</div>
         ) : (
-          payments.map((payment) => (
+          filteredPayments.map((payment) => (
             <div key={payment.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
               <div className="flex items-center gap-6">
                 <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -126,7 +155,12 @@ const Payments = () => {
                     <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Success</Badge>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">Invoice #{payment.invoiceNumber}</span>
+                    <span className="flex items-center gap-1">
+                      Invoice 
+                      <Link to={`/dashboard/invoices?search=${payment.invoiceNumber}`} className="text-blue-400 hover:underline">
+                        #{payment.invoiceNumber}
+                      </Link>
+                    </span>
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {payment.createdAt?.toDate().toLocaleDateString()}</span>
                   </div>
                 </div>

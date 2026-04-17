@@ -22,9 +22,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, CheckCircle2, User as UserIcon, Search } from "lucide-react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, onSnapshot } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, onSnapshot, where } from "firebase/firestore";
+import { useState, useEffect, useContext } from "react";
 import { cn } from "@/lib/utils";
+import { AuthContext } from "../../App";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
 
@@ -53,13 +54,15 @@ interface JobFormProps {
 import { SchedulePicker } from "../SchedulePicker";
 
 export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
+  const { user, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableTeam, setAvailableTeam] = useState<any[]>([]);
   const [teamSearch, setTeamSearch] = useState("");
   const [customTasks, setCustomTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, "users"));
+    // Filter out super admin from the list
+    const q = query(collection(db, "users"), where("email", "!=", "apauloprod@gmail.com"));
     getDocs(q).then(snap => {
       setAvailableTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -69,9 +72,19 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
     });
   }, []);
 
-  const filteredTeam = availableTeam.filter(m => 
-    (m.displayName || m.email || "").toLowerCase().includes(teamSearch.toLowerCase())
-  );
+  const currentRole = impersonatedUser?.role || (availableTeam.find(u => u.id === user?.uid)?.role) || 'team';
+  const currentUserId = impersonatedUser?.uid || user?.uid;
+
+  const filteredTeam = availableTeam.filter(m => {
+    const matchesSearch = (m.displayName || m.email || "").toLowerCase().includes(teamSearch.toLowerCase());
+    
+    // Role-based filtering
+    if (currentRole === 'team') {
+      return matchesSearch && m.id === currentUserId;
+    }
+    
+    return matchesSearch;
+  });
 
   const form = useForm({
     resolver: zodResolver(jobSchema),
@@ -403,7 +416,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
                       {member.photoURL ? (
-                        <img src={member.photoURL} className="h-full w-full object-cover" />
+                        <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                       ) : (
                         <UserIcon className="h-3 w-3" />
                       )}

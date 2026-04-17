@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, getDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDoc, doc, where, limit, getDocs } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -98,34 +98,83 @@ const Invoices = () => {
     }
   };
 
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      }
+    };
+    fetchBusinessSettings();
+  }, []);
+
   const downloadInvoice = (inv: any) => {
     const doc = new jsPDF();
     
+    // Use invoice's stored business info or fall back to current settings
+    const bName = inv.businessName || businessSettings?.businessName || "Your Company";
+    const bLogo = inv.businessLogo || businessSettings?.businessLogo;
+    const bDetails = inv.businessDetails || (businessSettings?.address 
+      ? `${businessSettings.address.street}\n${businessSettings.address.city}, ${businessSettings.address.postcode}`
+      : businessSettings?.businessDetails);
+
+    // Add Logo if exists
+    if (bLogo) {
+      try {
+        doc.addImage(bLogo, 'PNG', 20, 10, 30, 30);
+      } catch (e) {
+        console.error("Error adding logo to PDF:", e);
+      }
+    }
+
     doc.setFontSize(22);
-    doc.text("INVOICE", 105, 20, { align: "center" });
+    doc.text("INVOICE", 200, 20, { align: "right" });
     
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(bName, 20, 45);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    if (bDetails) {
+      const detailsLines = doc.splitTextToSize(bDetails, 80);
+      doc.text(detailsLines, 20, 52);
+    }
+
     doc.setFontSize(12);
-    doc.text(`Invoice Number: ${inv.invoiceNumber}`, 20, 40);
-    doc.text(`Date: ${inv.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 20, 48);
-    doc.text(`Due Date: ${inv.dueDate?.toDate().toLocaleDateString() || "N/A"}`, 20, 56);
-    doc.text(`Client: ${inv.clientName}`, 20, 64);
+    doc.text(`Invoice Number: ${inv.invoiceNumber}`, 200, 45, { align: "right" });
+    doc.text(`Date: ${inv.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
+    
+    const dueDateStr = inv.dueDate ? (inv.dueDate.toDate ? inv.dueDate.toDate().toLocaleDateString() : new Date(inv.dueDate).toLocaleDateString()) : "N/A";
+    doc.text(`Due Date: ${dueDateStr}`, 200, 59, { align: "right" });
+    
+    doc.setDrawColor(200);
+    doc.line(20, 80, 200, 80);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 20, 90);
+    doc.setFont("helvetica", "normal");
+    doc.text(inv.clientName, 20, 97);
     
     const tableData = inv.items.map((item: any) => [
       item.description,
-      `$${item.price.toLocaleString()}`
+      `$${(item.price || item.unitPrice || 0).toLocaleString()}`
     ]);
     
     autoTable(doc, {
-      startY: 80,
+      startY: 110,
       head: [['Description', 'Price']],
       body: tableData,
-      foot: [['Total', `$${inv.total.toLocaleString()}`]],
+      foot: [['Total', `$${(inv.total || inv.totalHT || 0).toLocaleString()}`]],
       theme: 'grid',
       headStyles: { fillColor: [0, 0, 0] },
     });
     
     if (inv.notes) {
-      const finalY = (doc as any).lastAutoTable?.finalY || 80;
+      const finalY = (doc as any).lastAutoTable?.finalY || 110;
       doc.text("Notes:", 20, finalY + 20);
       doc.setFontSize(10);
       doc.text(inv.notes, 20, finalY + 28, { maxWidth: 170 });
@@ -149,7 +198,9 @@ const Invoices = () => {
 
   const filteredInvoices = invoices.filter(inv => {
     const matchesSearch = inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          inv.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
+                          inv.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          inv.jobId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          inv.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || inv.status === statusFilter;
     return matchesSearch && matchesStatus;
   }).sort((a, b) => {
@@ -173,7 +224,7 @@ const Invoices = () => {
               New Invoice
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Invoice</DialogTitle>
             </DialogHeader>
@@ -213,7 +264,7 @@ const Invoices = () => {
       </div>
 
       <Dialog open={!!editingInvoice} onOpenChange={(open) => !open && setEditingInvoice(null)}>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Invoice</DialogTitle>
           </DialogHeader>

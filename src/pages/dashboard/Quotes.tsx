@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc, limit } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -98,33 +98,80 @@ const Quotes = () => {
     }
   };
 
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      }
+    };
+    fetchBusinessSettings();
+  }, []);
+
   const downloadQuote = (quote: any) => {
     const doc = new jsPDF();
     
+    // Use quote's stored business info or fall back to current settings
+    const bName = quote.businessName || businessSettings?.businessName || "Your Company";
+    const bLogo = quote.businessLogo || businessSettings?.businessLogo;
+    const bDetails = quote.businessDetails || (businessSettings?.address 
+      ? `${businessSettings.address.street}\n${businessSettings.address.city}, ${businessSettings.address.postcode}`
+      : businessSettings?.businessDetails);
+
+    // Add Logo if exists
+    if (bLogo) {
+      try {
+        doc.addImage(bLogo, 'PNG', 20, 10, 30, 30);
+      } catch (e) {
+        console.error("Error adding logo to PDF:", e);
+      }
+    }
+
     doc.setFontSize(22);
-    doc.text("SERVICE QUOTE", 105, 20, { align: "center" });
+    doc.text("SERVICE QUOTE", 200, 20, { align: "right" });
     
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(bName, 20, 45);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    if (bDetails) {
+      const detailsLines = doc.splitTextToSize(bDetails, 80);
+      doc.text(detailsLines, 20, 52);
+    }
+
     doc.setFontSize(12);
-    doc.text(`Quote Number: ${quote.quoteNumber}`, 20, 40);
-    doc.text(`Date: ${quote.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 20, 48);
-    doc.text(`Client: ${quote.clientName}`, 20, 56);
+    doc.text(`Quote Number: ${quote.quoteNumber}`, 200, 45, { align: "right" });
+    doc.text(`Date: ${quote.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
+    
+    doc.setDrawColor(200);
+    doc.line(20, 80, 200, 80);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Bill To:", 20, 90);
+    doc.setFont("helvetica", "normal");
+    doc.text(quote.clientName, 20, 97);
     
     const tableData = quote.items.map((item: any) => [
       item.description,
-      `$${item.price.toLocaleString()}`
+      `$${(item.price || item.unitPrice || 0).toLocaleString()}`
     ]);
     
     autoTable(doc, {
-      startY: 70,
+      startY: 110,
       head: [['Description', 'Price']],
       body: tableData,
-      foot: [['Total', `$${quote.total.toLocaleString()}`]],
+      foot: [['Total', `$${(quote.total || quote.totalHT || 0).toLocaleString()}`]],
       theme: 'grid',
       headStyles: { fillColor: [0, 0, 0] },
     });
     
     if (quote.notes) {
-      const finalY = (doc as any).lastAutoTable?.finalY || 70;
+      const finalY = (doc as any).lastAutoTable?.finalY || 110;
       doc.text("Notes:", 20, finalY + 20);
       doc.setFontSize(10);
       doc.text(quote.notes, 20, finalY + 28, { maxWidth: 170 });
@@ -228,7 +275,7 @@ const Quotes = () => {
               New Quote
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Quote</DialogTitle>
             </DialogHeader>
@@ -268,7 +315,7 @@ const Quotes = () => {
       </div>
 
       <Dialog open={!!editingQuote} onOpenChange={(open) => !open && setEditingQuote(null)}>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Quote</DialogTitle>
           </DialogHeader>

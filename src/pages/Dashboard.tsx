@@ -29,7 +29,8 @@ import {
   Mail,
   MapPin,
   LogIn,
-  Sparkles
+  Sparkles,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ import Timesheets from "./dashboard/Timesheets";
 import Marketing from "./dashboard/Marketing";
 import Overview from "./dashboard/Overview";
 import Expenses from "./dashboard/Expenses";
+import AdminControl from "./dashboard/AdminControl";
 
 interface SidebarItemProps {
   icon: any;
@@ -103,7 +105,8 @@ const Sidebar = ({
   menuItems, 
   location, 
   user, 
-  logout 
+  logout,
+  userRole
 }: any) => (
   <div className="flex flex-col h-full bg-black border-r border-white/5 w-64">
     <div className="p-6 flex items-center gap-3">
@@ -121,146 +124,150 @@ const Sidebar = ({
             Create New
           </Button>
         </DialogTrigger>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold tracking-tighter">
-              {activeForm === "client" ? "Add New Client" : 
-               activeForm === "visit" ? "Schedule New Visit" : 
-               activeForm === "request" ? "Create New Request" : 
-               activeForm === "quote" ? "Create New Quote" :
-               activeForm === "job" ? "Create New Job" :
-               activeForm === "invoice" ? "Create New Invoice" :
-               activeForm === "payment" ? "Record Payment" :
-               "What would you like to create?"}
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[1000px] w-[95vw] rounded-[2rem] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <div className="p-6 pb-2">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold tracking-tighter">
+                {activeForm === "client" ? "Add New Client" : 
+                 activeForm === "visit" ? "Schedule New Visit" : 
+                 activeForm === "request" ? "Create New Request" : 
+                 activeForm === "quote" ? "Create New Quote" :
+                 activeForm === "job" ? "Create New Job" :
+                 activeForm === "invoice" ? "Create New Invoice" :
+                 activeForm === "payment" ? "Record Payment" :
+                 "What would you like to create?"}
+              </DialogTitle>
+            </DialogHeader>
+          </div>
           
-          {!activeForm ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("client")}
-              >
-                <Users className="h-6 w-6" />
-                <span className="text-xs">Client</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("visit")}
-              >
-                <Calendar className="h-6 w-6" />
-                <span className="text-xs">Visit</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("request")}
-              >
-                <FileText className="h-6 w-6" />
-                <span className="text-xs">Request</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("quote")}
-              >
-                <FileText className="h-6 w-6 text-blue-400" />
-                <span className="text-xs">Quote</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("job")}
-              >
-                <CheckSquare className="h-6 w-6 text-emerald-400" />
-                <span className="text-xs">Job</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("invoice")}
-              >
-                <FileText className="h-6 w-6 text-amber-400" />
-                <span className="text-xs">Invoice</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                onClick={() => setActiveForm("payment")}
-              >
-                <CreditCard className="h-6 w-6 text-purple-400" />
-                <span className="text-xs">Payment</span>
-              </Button>
-            </div>
-          ) : (
-            <div className="pt-4">
-              {activeForm === "client" && (
-                <ClientForm 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-              {activeForm === "visit" && (
-                <VisitForm 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-              {activeForm === "request" && (
-                <RequestFormInternal 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-              {activeForm === "quote" && (
-                <QuoteForm 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-              {activeForm === "job" && (
-                <JobForm 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-              {activeForm === "invoice" && (
-                <InvoiceForm 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-              {activeForm === "payment" && (
-                <PaymentForm 
-                  onSuccess={() => {
-                    setCreateDialogOpen(false);
-                    setActiveForm(null);
-                  }} 
-                  onCancel={() => setActiveForm(null)}
-                />
-              )}
-            </div>
-          )}
+          <ScrollArea className="flex-1 px-6 pb-6">
+            {!activeForm ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("client")}
+                >
+                  <Users className="h-6 w-6" />
+                  <span className="text-xs">Client</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("visit")}
+                >
+                  <Calendar className="h-6 w-6" />
+                  <span className="text-xs">Visit</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("request")}
+                >
+                  <FileText className="h-6 w-6" />
+                  <span className="text-xs">Request</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("quote")}
+                >
+                  <FileText className="h-6 w-6 text-blue-400" />
+                  <span className="text-xs">Quote</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("job")}
+                >
+                  <CheckSquare className="h-6 w-6 text-emerald-400" />
+                  <span className="text-xs">Job</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("invoice")}
+                >
+                  <FileText className="h-6 w-6 text-amber-400" />
+                  <span className="text-xs">Invoice</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                  onClick={() => setActiveForm("payment")}
+                >
+                  <CreditCard className="h-6 w-6 text-purple-400" />
+                  <span className="text-xs">Payment</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-4">
+                {activeForm === "client" && (
+                  <ClientForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "visit" && (
+                  <VisitForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "request" && (
+                  <RequestFormInternal 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "quote" && (
+                  <QuoteForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "job" && (
+                  <JobForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "invoice" && (
+                  <InvoiceForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+                {activeForm === "payment" && (
+                  <PaymentForm 
+                    onSuccess={() => {
+                      setCreateDialogOpen(false);
+                      setActiveForm(null);
+                    }} 
+                    onCancel={() => setActiveForm(null)}
+                  />
+                )}
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
@@ -281,6 +288,14 @@ const Sidebar = ({
       <Separator className="my-6 bg-white/5 mx-4" />
       
       <div className="space-y-1">
+        {userRole === "admin" && user.email === "apauloprod@gmail.com" && (
+          <SidebarItem 
+            icon={Shield} 
+            label="Super Admin" 
+            to="/dashboard/admin" 
+            active={location.pathname === "/dashboard/admin"} 
+          />
+        )}
         <SidebarItem 
           icon={Clock} 
           label="Timesheets" 
@@ -328,7 +343,7 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<"client" | "visit" | "request" | "quote" | "job" | "invoice" | "payment" | null>(null);
-  const [userRole, setUserRole] = useState<"admin" | "team" | null>(null);
+  const [userRole, setUserRole] = useState<"admin" | "manager" | "team" | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activities, setActivities] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -387,7 +402,7 @@ export default function Dashboard() {
       { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
     ];
 
-    if (userRole === "admin") {
+    if (userRole === "admin" || userRole === "manager") {
       return [
         ...baseItems,
         { icon: Users, label: "Clients", to: "/dashboard/clients" },
@@ -436,18 +451,19 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden">
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar 
-          createDialogOpen={createDialogOpen}
-          setCreateDialogOpen={setCreateDialogOpen}
-          activeForm={activeForm}
-          setActiveForm={setActiveForm}
-          menuItems={menuItems}
-          location={location}
-          user={user}
-          logout={logout}
-        />
-      </div>
+        <div className="hidden lg:block">
+          <Sidebar 
+            createDialogOpen={createDialogOpen}
+            setCreateDialogOpen={setCreateDialogOpen}
+            activeForm={activeForm}
+            setActiveForm={setActiveForm}
+            menuItems={menuItems}
+            location={location}
+            user={user}
+            logout={logout}
+            userRole={userRole}
+          />
+        </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -470,6 +486,7 @@ export default function Dashboard() {
                   location={location}
                   user={user}
                   logout={logout}
+                  userRole={userRole}
                 />
               </SheetContent>
             </Sheet>
@@ -548,6 +565,7 @@ export default function Dashboard() {
             <Route path="/timesheets" element={<Timesheets />} />
             <Route path="/marketing" element={<Marketing />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/admin" element={<AdminControl />} />
           </Routes>
         </main>
       </div>

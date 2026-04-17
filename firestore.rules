@@ -48,7 +48,7 @@ service cloud.firestore {
       return isAuthenticated() && 
         (isAdmin() || 
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff']));
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'staff', 'team']));
     }
 
     function isValidEmail(email) {

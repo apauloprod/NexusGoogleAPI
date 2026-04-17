@@ -80,6 +80,15 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
   });
 
   useEffect(() => {
+    if (initialData) {
+      form.reset({
+        ...initialData,
+        dueDate: initialData.dueDate ? (typeof initialData.dueDate.toDate === 'function' ? initialData.dueDate.toDate().toISOString().split('T')[0] : initialData.dueDate.split('T')[0]) : new Date().toISOString().split('T')[0]
+      });
+    }
+  }, [initialData, form]);
+
+  useEffect(() => {
     if (!initialData?.id && !form.getValues("invoiceNumber")) {
       const fetchLatestInvoiceNumber = async () => {
         try {
@@ -279,7 +288,7 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
           </div>
           <div className="h-32 w-32 rounded-full bg-orange-400 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
             {businessSettings?.businessLogo ? (
-              <img src={businessSettings.businessLogo} className="h-full w-full object-contain p-4" />
+              <img src={businessSettings.businessLogo} className="h-full w-full object-contain p-4" referrerPolicy="no-referrer" />
             ) : (
               "Logo"
             )}
