@@ -10,7 +10,9 @@ import {
   History,
   CheckCircle2,
   AlertCircle,
-  DollarSign
+  DollarSign,
+  Trash2,
+  Edit2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +28,8 @@ import {
   doc, 
   serverTimestamp, 
   Timestamp,
-  getDoc
+  getDoc,
+  deleteDoc
 } from "firebase/firestore";
 import { 
   Dialog,
@@ -57,6 +60,8 @@ const Timesheets = () => {
   const [hourlyRate, setHourlyRate] = useState<number>(0);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [isManualDialogOpen, setIsManualDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<any>(null);
   const [manualEntry, setManualEntry] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     duration: 0,
@@ -184,6 +189,64 @@ const Timesheets = () => {
       await updateDoc(doc(db, "timesheets", id), {
         submissionStatus: "approved"
       });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, "timesheets");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this timesheet entry?")) return;
+    try {
+      await deleteDoc(doc(db, "timesheets", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "timesheets");
+    }
+  };
+
+  const handleEdit = (entry: any) => {
+    setEditingEntry(entry);
+    setManualEntry({
+      date: format(entry.startTime.toDate(), "yyyy-MM-dd"),
+      duration: entry.duration || 0,
+      startTime: format(entry.startTime.toDate(), "HH:mm"),
+      endTime: entry.endTime ? format(entry.endTime.toDate(), "HH:mm") : format(new Date(), "HH:mm"),
+      useTimes: !!entry.endTime,
+      type: "daily",
+      weeklyEntries: [],
+      notes: entry.notes || "",
+      userId: entry.userId
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingEntry) return;
+    try {
+      let finalDuration = manualEntry.duration;
+      let finalStart = new Date(manualEntry.date + "T" + manualEntry.startTime);
+      let finalEnd = new Date(manualEntry.date + "T" + manualEntry.endTime);
+
+      if (manualEntry.useTimes) {
+        finalDuration = differenceInMinutes(finalEnd, finalStart);
+      } else {
+        finalStart = new Date(manualEntry.date + "T09:00:00");
+        finalEnd = new Date(finalStart.getTime() + manualEntry.duration * 60 * 1000);
+      }
+
+      const rate = editingEntry.rate || hourlyRate;
+      const totalCost = (finalDuration / 60) * rate;
+
+      await updateDoc(doc(db, "timesheets", editingEntry.id), {
+        startTime: Timestamp.fromDate(finalStart),
+        endTime: Timestamp.fromDate(finalEnd),
+        duration: finalDuration,
+        totalCost,
+        notes: manualEntry.notes,
+        updatedAt: serverTimestamp()
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, "timesheets");
     }
@@ -521,6 +584,91 @@ const Timesheets = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="bg-black border-white/10 text-white rounded-[2rem] sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Timesheet Entry</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label>Input Mode</Label>
+                  <Select value={manualEntry.useTimes ? "times" : "duration"} onValueChange={(v) => setManualEntry({...manualEntry, useTimes: v === "times"})}>
+                    <SelectTrigger className="bg-white/5 border-white/10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10">
+                      <SelectItem value="times">Start & End Time</SelectItem>
+                      <SelectItem value="duration">Just Duration</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input 
+                  type="date" 
+                  value={manualEntry.date} 
+                  onChange={(e) => setManualEntry({...manualEntry, date: e.target.value})}
+                  className="bg-white/5 border-white/10"
+                />
+              </div>
+
+              <div className="space-y-4 p-4 rounded-2xl bg-white/5 border border-white/5">
+                {manualEntry.useTimes ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input 
+                        type="time" 
+                        value={manualEntry.startTime}
+                        onChange={(e) => setManualEntry({...manualEntry, startTime: e.target.value})}
+                        className="bg-white/5 border-white/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input 
+                        type="time" 
+                        value={manualEntry.endTime}
+                        onChange={(e) => setManualEntry({...manualEntry, endTime: e.target.value})}
+                        className="bg-white/5 border-white/10"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Duration (Hours:Minutes)</Label>
+                    <Input 
+                      type="time" 
+                      step="60"
+                      value={`${Math.floor(manualEntry.duration / 60).toString().padStart(2, '0')}:${(manualEntry.duration % 60).toString().padStart(2, '0')}`}
+                      onChange={(e) => {
+                        const [h, m] = e.target.value.split(':').map(Number);
+                        setManualEntry({...manualEntry, duration: (h * 60) + m});
+                      }}
+                      className="bg-white/5 border-white/10"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea 
+                  value={manualEntry.notes}
+                  onChange={(e) => setManualEntry({...manualEntry, notes: e.target.value})}
+                  placeholder="Work description..."
+                  className="bg-white/5 border-white/10 min-h-[60px]"
+                />
+              </div>
+              <Button onClick={handleUpdate} className="w-full h-12 bg-white text-black font-bold rounded-xl hover:bg-white/90">
+                Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Recent Entries</h2>
@@ -586,6 +734,26 @@ const Timesheets = () => {
                       <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white h-8" onClick={() => handleApprove(entry.id)}>
                         Approve
                       </Button>
+                    )}
+                    {(isManagerOrAdmin || (entry.userId === (impersonatedUser?.uid || user?.uid) && entry.submissionStatus !== 'approved')) && (
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="text-muted-foreground hover:text-white h-8 w-8 p-0" 
+                          onClick={() => handleEdit(entry)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="text-muted-foreground hover:text-destructive h-8 w-8 p-0" 
+                          onClick={() => handleDelete(entry.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

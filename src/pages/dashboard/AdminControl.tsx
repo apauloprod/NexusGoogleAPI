@@ -8,10 +8,11 @@ import {
   ChevronRight,
   MoreVertical,
   Activity,
-  UserPlus
+  UserPlus,
+  Trash2
 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, where, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, doc, updateDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +107,15 @@ const AdminControl = () => {
       await updateDoc(doc(db, "users", userId), updates);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, "users");
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user? This will remove their access to the site completely.")) return;
+    try {
+      await deleteDoc(doc(db, "users", userId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "users");
     }
   };
 
@@ -217,6 +227,13 @@ const AdminControl = () => {
                       <DropdownMenuItem onClick={() => handleImpersonate(userItem)}>
                         <UserPlus className="h-4 w-4 mr-2" />
                         Impersonate User
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => deleteUser(userItem.id)}
+                        className="text-red-400 focus:text-red-400"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete User
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

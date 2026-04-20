@@ -11,12 +11,13 @@ import {
   DollarSign,
   Edit2,
   Search,
-  Filter
+  Filter,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, deleteDoc, doc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -50,6 +51,15 @@ const Payments = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this payment record?")) return;
+    try {
+      await deleteDoc(doc(db, "payments", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "payments");
+    }
+  };
 
   useEffect(() => {
     const search = searchParams.get("search");
@@ -207,6 +217,14 @@ const Payments = () => {
                   </Button>
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
                     <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(payment.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

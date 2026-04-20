@@ -9,6 +9,7 @@ import { motion } from "motion/react";
 
 export default function PublicQuoteApproval() {
   const { quoteId } = useParams();
+  const navigate = useNavigate();
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<'pending' | 'approved' | 'error'>('pending');
@@ -43,6 +44,13 @@ export default function PublicQuoteApproval() {
 
   const handleApprove = async () => {
     if (!quote || !quoteId) return;
+
+    if (quote.paymentRequired) {
+      const amountToPay = quote.depositAmount > 0 ? quote.depositAmount : quote.total;
+      navigate(`/pay?quoteId=${quoteId}&amount=${amountToPay}`);
+      return;
+    }
+
     setLoading(true);
     try {
       // 1. Update Quote Status
@@ -196,14 +204,16 @@ export default function PublicQuoteApproval() {
             <div className="glass p-8 rounded-[2rem] border-white/5 sticky top-8">
               <h2 className="text-xl font-bold mb-6">Action Required</h2>
               <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-                Please review the details of your quote. By clicking "Approve Quote", you agree to the terms and services listed.
+                {quote?.paymentRequired 
+                  ? `To approve this quote, a ${quote.depositAmount > 0 ? `deposit of $${quote.depositAmount.toLocaleString()}` : 'full payment of $' + quote.total?.toLocaleString()} is required.`
+                  : 'Please review the details of your quote. By clicking "Approve Quote", you agree to the terms and services listed.'}
               </p>
               <Button 
                 className="w-full h-14 rounded-2xl bg-white text-black hover:bg-white/90 font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all active:scale-95"
                 onClick={handleApprove}
                 disabled={loading}
               >
-                {loading ? "Processing..." : "Approve Quote"}
+                {loading ? "Processing..." : (quote?.paymentRequired ? "Review & Pay" : "Approve Quote")}
               </Button>
               <p className="text-center mt-4 text-[10px] text-muted-foreground uppercase tracking-widest">
                 Secure Approval Powered by CRM

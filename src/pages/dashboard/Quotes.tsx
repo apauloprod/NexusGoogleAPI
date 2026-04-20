@@ -13,14 +13,15 @@ import {
   Search,
   Filter,
   Download, 
-  Edit2
+  Edit2,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc, limit, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc, limit, Timestamp, deleteDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -60,6 +61,15 @@ const Quotes = () => {
   const [isSending, setIsSending] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this quote?")) return;
+    try {
+      await deleteDoc(doc(db, "quotes", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "quotes");
+    }
+  };
 
   useEffect(() => {
     const search = searchParams.get("search");
@@ -437,6 +447,14 @@ const Quotes = () => {
                     onClick={() => setEditingQuote(quote)}
                   >
                     <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(quote.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                   <Button 
                     variant="ghost" 

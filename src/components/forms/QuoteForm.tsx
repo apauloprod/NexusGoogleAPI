@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { AuthContext } from "../../App";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
+import { cn } from "@/lib/utils";
 
 const quoteSchema = z.object({
   clientId: z.string().min(1, "Please select a client"),
@@ -38,6 +39,8 @@ const quoteSchema = z.object({
   notes: z.string().optional(),
   scheduledAt: z.string().optional(),
   duration: z.string().optional(),
+  depositAmount: z.coerce.number().min(0).optional(),
+  paymentRequired: z.boolean().default(true),
 });
 
 type QuoteFormValues = z.infer<typeof quoteSchema>;
@@ -94,6 +97,8 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
         : "",
       duration: initialData?.duration || "1h",
+      depositAmount: initialData?.depositAmount || 0,
+      paymentRequired: initialData?.paymentRequired !== undefined ? initialData.paymentRequired : true,
     },
   });
 
@@ -394,23 +399,74 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Additional Notes</FormLabel>
-              <FormControl>
-                <Textarea 
-                  placeholder="Terms, conditions, or extra info..." 
-                  {...field} 
-                  className="bg-white/5 border-white/10 min-h-[80px]" 
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Additional Notes</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Terms, conditions, or extra info..." 
+                    {...field} 
+                    className="bg-white/5 border-white/10 min-h-[80px]" 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Payment Options</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="paymentRequired"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Require Payment</FormLabel>
+                      <p className="text-[10px] text-muted-foreground">Require payment for approval</p>
+                    </div>
+                    <FormControl>
+                      <div 
+                        className={cn(
+                          "w-10 h-5 rounded-full relative cursor-pointer transition-colors",
+                          field.value ? "bg-emerald-500" : "bg-white/10"
+                        )}
+                        onClick={() => field.onChange(!field.value)}
+                      >
+                        <div className={cn(
+                          "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
+                          field.value ? "left-6" : "left-1"
+                        )} />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              {form.watch("paymentRequired") && (
+                <FormField
+                  control={form.control}
+                  name="depositAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Deposit Amount (Optional)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                          <Input type="number" placeholder="0.00" className="pl-7 bg-white/5 border-white/10" {...field} />
+                        </div>
+                      </FormControl>
+                      <p className="text-[10px] text-muted-foreground mt-1">Leave at 0 to require full payment</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              )}
+            </div>
+          </div>
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>

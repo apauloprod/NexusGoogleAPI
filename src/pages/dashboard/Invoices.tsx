@@ -12,14 +12,15 @@ import {
   Edit2,
   Send,
   Search,
-  Filter
+  Filter,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, getDoc, doc, where, limit, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDoc, doc, where, limit, getDocs, deleteDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -57,6 +58,15 @@ const Invoices = () => {
   const [isSending, setIsSending] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this invoice?")) return;
+    try {
+      await deleteDoc(doc(db, "invoices", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "invoices");
+    }
+  };
 
   useEffect(() => {
     const search = searchParams.get("search");
@@ -390,6 +400,14 @@ const Invoices = () => {
                     onClick={() => downloadInvoice(inv)}
                   >
                     <Download className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(inv.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

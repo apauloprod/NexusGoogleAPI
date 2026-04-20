@@ -4,12 +4,15 @@ import {
   ArrowUpRight,
   User as UserIcon,
   Mail,
-  MapPin
+  MapPin,
+  Trash2,
+  Share2,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where, deleteDoc } from "firebase/firestore";
 import { AuthContext } from "../../App";
 import { useNavigate } from "react-router-dom";
 
@@ -42,6 +45,26 @@ const Requests = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<any>(null);
   const [convertingRequest, setConvertingRequest] = useState<any>(null);
+  const [requestToDelete, setRequestToDelete] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyPublicLink = () => {
+    const bizId = impersonatedUser?.businessId || currentUserData?.businessId;
+    if (!bizId) return;
+    const url = `${window.location.origin}/#/request?biz=${bizId}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this request?")) return;
+    try {
+      await deleteDoc(doc(db, "requests", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "requests");
+    }
+  };
 
   useEffect(() => {
     if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
@@ -124,7 +147,16 @@ const Requests = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Requests</h1>
           <p className="text-muted-foreground">Manage incoming quote requests from potential clients.</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            className="border-white/10 hover:bg-white/5 rounded-xl gap-2 font-bold"
+            onClick={copyPublicLink}
+          >
+            {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Share2 className="h-4 w-4" />}
+            {copied ? "Copied Link" : "Copy Form Link"}
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
               <Plus className="h-4 w-4" />
@@ -144,6 +176,7 @@ const Requests = () => {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
@@ -224,6 +257,14 @@ const Requests = () => {
                       Convert to Quote
                     </Button>
                   )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-destructive" 
+                    onClick={() => handleDelete(req.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" onClick={() => setEditingRequest(req)}>
                     <ArrowUpRight className="h-5 w-5" />
                   </Button>

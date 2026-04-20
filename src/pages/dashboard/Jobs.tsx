@@ -13,7 +13,8 @@ import {
   Search,
   Filter,
   Phone,
-  MapPin
+  MapPin,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { AuthContext } from "../../App";
 import { useContext } from "react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit, Timestamp, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit, Timestamp, getDocs, deleteDoc } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -49,6 +50,15 @@ const Jobs = () => {
   const [isConverting, setIsConverting] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this job?")) return;
+    try {
+      await deleteDoc(doc(db, "jobs", id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, "jobs");
+    }
+  };
 
   useEffect(() => {
     const search = searchParams.get("search");
@@ -422,6 +432,14 @@ const Jobs = () => {
                     onClick={() => setEditingJob(job)}
                   >
                     <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(job.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
