@@ -15,8 +15,8 @@ export const AuthContext = createContext<{
   loading: boolean;
   currentUserData: any | null;
   setCurrentUserData: (data: any | null) => void;
-  impersonatedUser: { uid: string; role: string; businessId: string } | null;
-  setImpersonatedUser: (user: { uid: string; role: string; businessId: string } | null) => void;
+  impersonatedUser: { uid: string; role: string; businessId: string; displayName?: string } | null;
+  setImpersonatedUser: (user: { uid: string; role: string; businessId: string; displayName?: string } | null) => void;
 }>({ 
   user: null, 
   loading: true,
@@ -30,7 +30,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentUserData, setCurrentUserData] = useState<any | null>(null);
-  const [impersonatedUser, setImpersonatedUser] = useState<{ uid: string; role: string; businessId: string } | null>(null);
+  const [impersonatedUser, setImpersonatedUser] = useState<{ uid: string; role: string; businessId: string; displayName?: string } | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");

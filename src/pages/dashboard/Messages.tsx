@@ -125,6 +125,8 @@ const Messages = () => {
     (c.displayName || c.name || c.email)?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const effectiveUid = impersonatedUser?.uid || user?.uid;
+
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
       {/* Contact List */}
@@ -223,24 +225,44 @@ const Messages = () => {
             <ScrollArea className="flex-1 p-6">
               <div className="space-y-6">
                 {messages.map((msg) => (
-                  <div key={msg.id} className={`flex gap-3 max-w-[80%] ${msg.senderId === user.uid ? 'ml-auto flex-row-reverse' : ''}`}>
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                      msg.senderId === user.uid ? 'bg-white border border-white' : 'bg-white/5 border border-white/10'
-                    }`}>
-                      <UserIcon className={`h-4 w-4 ${msg.senderId === user.uid ? 'text-black' : 'text-muted-foreground'}`} />
+                  <div key={msg.id} className={`flex flex-col gap-1 ${msg.senderId === effectiveUid ? 'items-end' : 'items-start'} group animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                    <div className="flex items-center gap-2 px-1">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${msg.senderId === effectiveUid ? 'text-white/60' : 'text-muted-foreground'}`}>
+                        {msg.senderId === effectiveUid ? 'You' : msg.senderName}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {msg.createdAt?.toDate() ? format(msg.createdAt.toDate(), "MMM d, HH:mm") : "..."}
+                      </span>
                     </div>
-                    <div className={`p-4 rounded-2xl ${
-                      msg.senderId === user.uid 
-                        ? 'bg-white text-black rounded-tr-none' 
-                        : 'bg-white/5 border border-white/10 rounded-tl-none'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-bold uppercase opacity-60">{msg.type}</span>
+                    <div className={`flex gap-3 max-w-[85%] ${msg.senderId === effectiveUid ? 'flex-row-reverse' : ''}`}>
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 border transition-all ${
+                        msg.senderId === effectiveUid 
+                          ? 'bg-white border-white' 
+                          : 'bg-white/5 border-white/10'
+                      }`}>
+                        <UserIcon className={`h-4 w-4 ${msg.senderId === effectiveUid ? 'text-black' : 'text-muted-foreground'}`} />
                       </div>
-                      <p className="text-sm">{msg.content}</p>
-                      <p className={`text-[10px] mt-2 ${msg.senderId === user.uid ? 'text-black/60' : 'text-muted-foreground'}`}>
-                        {msg.createdAt?.toDate() ? format(msg.createdAt.toDate(), "HH:mm") : "..."}
-                      </p>
+                      <div className={`p-4 rounded-2xl shadow-xl ${
+                        msg.senderId === effectiveUid 
+                          ? 'bg-white text-black rounded-tr-none' 
+                          : 'bg-white/5 border border-white/10 rounded-tl-none backdrop-blur-sm'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${
+                            msg.senderId === effectiveUid 
+                              ? 'bg-black/5 text-black/40' 
+                              : 'bg-white/10 text-white/40'
+                          }`}>
+                            {msg.type}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">{msg.content}</p>
+                        <p className={`text-[9px] mt-2 font-bold ${
+                          msg.senderId === effectiveUid ? 'text-black/40' : 'text-muted-foreground'
+                        }`}>
+                          {msg.createdAt?.toDate() ? format(msg.createdAt.toDate(), "HH:mm") : "..."}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}

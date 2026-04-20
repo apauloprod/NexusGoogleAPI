@@ -296,7 +296,7 @@ const Sidebar = ({
       <Separator className="my-6 bg-white/5 mx-4" />
       
       <div className="space-y-1">
-        {userRole === "admin" && user.email === "apauloprod@gmail.com" && (
+        {userRole === "super-admin" && (
           <SidebarItem 
             icon={Shield} 
             label="Super Admin" 
@@ -330,7 +330,9 @@ const Sidebar = ({
         </div>
         <div className="flex-1 overflow-hidden">
           <p className="text-sm font-bold text-white truncate">{displayName}</p>
-          <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wider font-bold mb-0.5">{displayRole}</p>
+          <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wider font-bold mb-0.5">
+            {displayRole === 'super-admin' ? 'System Admin' : displayRole === 'admin' ? 'Business Owner' : displayRole}
+          </p>
           <p className="text-[10px] text-muted-foreground truncate opacity-50">{email}</p>
         </div>
       </div>
@@ -353,7 +355,7 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [activeForm, setActiveForm] = useState<"client" | "visit" | "request" | "quote" | "job" | "invoice" | "payment" | null>(null);
-  const [userRole, setUserRole] = useState<"admin" | "manager" | "team" | null>(null);
+  const [userRole, setUserRole] = useState<"admin" | "manager" | "team" | "super-admin" | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activities, setActivities] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -441,7 +443,13 @@ export default function Dashboard() {
     });
 
     // Handle role (impersonation or real)
-    const role = impersonatedUser ? impersonatedUser.role : (currentUserData.role || "team");
+    let role = impersonatedUser ? impersonatedUser.role : (currentUserData?.role || "team");
+    
+    // Explicitly set super-admin if email matches AND not impersonating or impersonating the super admin email
+    if (isSuperAdmin && !impersonatedUser) {
+      role = "super-admin";
+    }
+    
     setUserRole(role as any);
 
     // Fetch recent activities for this business
@@ -473,7 +481,7 @@ export default function Dashboard() {
       { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
     ];
 
-    if (userRole === "admin" || userRole === "manager") {
+    if (userRole === "admin" || userRole === "manager" || userRole === "super-admin") {
       return [
         ...baseItems,
         { icon: Users, label: "Clients", to: "/dashboard/clients" },
@@ -611,7 +619,8 @@ export default function Dashboard() {
                         setImpersonatedUser({ 
                           uid: member.id, 
                           role: member.role,
-                          businessId: member.businessId || member.id
+                          businessId: member.businessId || member.id,
+                          displayName: member.displayName || member.email
                         });
                       }
                     }
