@@ -39,7 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { db, auth, signInWithGoogle, logout, handleFirestoreError, OperationType } from "../firebase";
-import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, setDoc, serverTimestamp, where } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, setDoc, serverTimestamp, where, getDocs, deleteDoc } from "firebase/firestore";
 import { AuthContext } from "../App";
 import { useContext, useMemo } from "react";
 
@@ -366,23 +366,51 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Initialize businessId and role if it's a first-time login
+    // Initialize businessId and role correctly
     const checkUser = async () => {
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
+      
       if (!snap.exists()) {
-        const role = user.email === "apauloprod@gmail.com" ? "admin" : "team";
-        // If team member is invited, they might not be created yet, but addTeamMember creates them.
-        // If they sign in and don't exist, they are likely a new independent business manager/owner if not already in system.
-        // Actually, if they are not in the system, they should probably be 'admin' of their own new business.
-        await setDoc(userRef, {
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          role: role,
-          businessId: user.uid, // Their own business
-          createdAt: serverTimestamp()
-        });
+        // Check if user was invited (invited docs have email but no uid yet or different doc ID)
+        // Actually, invited users are currently created with random doc IDs.
+        // We search by email to see if they were pre-invited.
+        const inviteQuery = query(collection(db, "users"), where("email", "==", user.email));
+        const inviteSnap = await getDocs(inviteQuery);
+        
+        const isSuperAdmin = user.email === "apauloprod@gmail.com";
+
+        if (!inviteSnap.empty) {
+          // User was invited. Claim the record by copying data to a doc with their real UID.
+          // This ensures AuthContext.currentUserData (based on snap(doc(users, uid))) works.
+          const inviteDoc = inviteSnap.docs[0];
+          const inviteData = inviteDoc.data();
+          
+          await setDoc(userRef, {
+            ...inviteData,
+            uid: user.uid,
+            displayName: user.displayName || inviteData.displayName,
+            photoURL: user.photoURL,
+            updatedAt: serverTimestamp(),
+            // Ensure businessId exists
+            businessId: inviteData.businessId || user.uid
+          });
+          
+          // Delete the temporary invite doc if it wasn't already the UID doc
+          if (inviteDoc.id !== user.uid) {
+            await deleteDoc(inviteDoc.ref);
+          }
+        } else {
+          // New independent business owner
+          await setDoc(userRef, {
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            role: isSuperAdmin ? "admin" : "admin", // New users starting out are admins of their own business
+            businessId: user.uid, // Their own business
+            createdAt: serverTimestamp()
+          });
+        }
       } else if (!snap.data().businessId) {
         // Legacy support: add businessId if missing
         await updateDoc(userRef, { businessId: user.uid });
@@ -401,8 +429,8 @@ export default function Dashboard() {
     const isSuperAdmin = user?.email === "apauloprod@gmail.com";
     
     if (isSuperAdmin) {
-      // Super admin always sees all business owners (admins) to allow switching between them
-      teamQuery = query(collection(db, "users"), where("role", "==", "admin"), limit(100));
+      // Super admin can see ALL users in the system to impersonate anyone
+      teamQuery = query(collection(db, "users"), limit(200));
     } else {
       // Regular view shows team for that business
       teamQuery = query(collection(db, "users"), where("businessId", "==", businessId));
@@ -591,7 +619,9 @@ export default function Dashboard() {
                     <Separator className="my-2 bg-white/5" />
                     {teamMembers.filter(m => m.id !== user.uid).map(member => (
                       <SelectItem key={member.id} value={member.id} className="text-[10px] uppercase">
-                        {member.businessName ? `${member.businessName} (${member.displayName || member.email.split('@')[0]})` : (member.displayName || member.email.split('@')[0])}
+                        {member.businessName ? `${member.businessName} - ` : ""}
+                        {member.displayName || member.email.split('@')[0]} 
+                        <span className="ml-1 opacity-50">({member.role})</span>
                       </SelectItem>
                     ))}
                   </SelectContent>

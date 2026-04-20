@@ -77,9 +77,9 @@ const Settings = () => {
   });
 
   useEffect(() => {
-    if (!user || !currentUserData?.businessId) return;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
     
-    const businessId = currentUserData.businessId;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
     // Fetch custom tasks
     const tasksQuery = query(collection(db, "customTasks"), where("businessId", "==", businessId));
@@ -87,8 +87,8 @@ const Settings = () => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Fetch business data
-    const unsubBusiness = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    // Fetch business data (from the user document representing the business owner)
+    const unsubBusiness = onSnapshot(doc(db, "users", businessId), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setBusinessData({
@@ -114,7 +114,7 @@ const Settings = () => {
       unsubBusiness();
       unsubTeam();
     };
-  }, [user, currentUserData?.businessId]);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isAdmin = role === 'admin';
@@ -128,11 +128,12 @@ const Settings = () => {
   }, [isManagerOrAdmin, activeTab]);
 
   const addCustomTask = async () => {
-    if (!newTask.name || !currentUserData?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
+    if (!newTask.name || !businessId) return;
     try {
       await addDoc(collection(db, "customTasks"), {
         ...newTask,
-        businessId: currentUserData.businessId,
+        businessId: businessId,
         createdAt: serverTimestamp()
       });
       setNewTask({ name: "", description: "", defaultPrice: 0 });
@@ -151,15 +152,16 @@ const Settings = () => {
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
+    if (!file || !user || !businessId) return;
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `logos/${user.uid}/${file.name}`);
+      const storageRef = ref(storage, `logos/${businessId}/${file.name}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       setBusinessData(prev => ({ ...prev, businessLogo: url }));
-      await updateDoc(doc(db, "users", user.uid), { businessLogo: url });
+      await updateDoc(doc(db, "users", businessId), { businessLogo: url });
     } catch (error) {
       console.error("Error uploading logo:", error);
     } finally {
@@ -192,9 +194,10 @@ const Settings = () => {
   };
 
   const handleSaveBusiness = async () => {
-    if (!user) return;
+    const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
+    if (!user || !businessId) return;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateDoc(doc(db, "users", businessId), {
         ...businessData,
         updatedAt: serverTimestamp()
       });
@@ -205,13 +208,14 @@ const Settings = () => {
   };
 
   const addTeamMember = async () => {
-    if (!newMemberEmail || !newMemberName || !currentUserData?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
+    if (!newMemberEmail || !newMemberName || !businessId) return;
     try {
       await addDoc(collection(db, "users"), {
         email: newMemberEmail,
         displayName: newMemberName,
         role: "team",
-        businessId: currentUserData.businessId,
+        businessId: businessId,
         hourlyRate: 25, // Default rate
         createdAt: serverTimestamp()
       });

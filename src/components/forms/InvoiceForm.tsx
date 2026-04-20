@@ -22,7 +22,7 @@ import {
 import { Plus, Trash2, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit, where, onSnapshot } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit, where, onSnapshot, Timestamp } from "firebase/firestore";
 import { useState, useEffect, useMemo, useContext } from "react";
 import { format } from "date-fns";
 import { AuthContext } from "../../App";

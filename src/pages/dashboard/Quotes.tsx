@@ -128,14 +128,15 @@ const Quotes = () => {
 
   useEffect(() => {
     const fetchBusinessSettings = async () => {
-      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        setBusinessSettings(snap.docs[0].data());
+      if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+      const snap = await getDoc(doc(db, "users", businessId));
+      if (snap.exists()) {
+        setBusinessSettings(snap.data());
       }
     };
     fetchBusinessSettings();
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const downloadQuote = (quote: any) => {
     const doc = new jsPDF();

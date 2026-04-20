@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { AuthContext } from "../../App";
 import { useContext } from "react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit, Timestamp } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -129,7 +129,7 @@ const Jobs = () => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              invoice: { id: invoiceId, ...invoiceData, dueDate: invoiceData.dueDate.toISOString() },
+              invoice: { id: invoiceId, ...invoiceData, dueDate: invoiceData.dueDate.toDate().toISOString() },
               clientEmail: clientData.email,
               appUrl: window.location.origin,
             }),
