@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { 
   Plus, 
   FileText,
@@ -35,8 +35,24 @@ import autoTable from "jspdf-autotable";
 
 
 
+import { AuthContext } from "../../App";
+import { useContext } from "react";
+
+
+
 const Quotes = () => {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -53,16 +69,26 @@ const Quotes = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const q = query(
+      collection(db, "quotes"), 
+      where("businessId", "==", businessId),
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setQuotes(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "quotes");
+      setLoading(false);
     });
+
     return () => unsubscribe();
-  }, []);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const sendQuoteEmail = async (quote: any) => {
     setIsSending(quote.id);

@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import { useState } from "react";
+import { useState, useContext } from "react";
+import { AuthContext } from "../../App";
 
 const clientSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/select";
 
 export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps) {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ClientFormValues>({
@@ -59,6 +61,9 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
   });
 
   async function onSubmit(values: ClientFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+    
     setIsSubmitting(true);
     try {
       if (initialData?.id) {
@@ -70,6 +75,7 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
       } else {
         await addDoc(collection(db, "clients"), {
           ...values,
+          businessId: businessId,
           jobsCount: 0,
           createdAt: serverTimestamp(),
         });

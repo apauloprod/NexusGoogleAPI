@@ -23,8 +23,9 @@ import { Plus, Trash2, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, limit, where, onSnapshot } from "firebase/firestore";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useContext } from "react";
 import { format } from "date-fns";
+import { AuthContext } from "../../App";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
 
@@ -55,16 +56,41 @@ interface InvoiceFormProps {
 
 
 export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormProps) {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [customTasks, setCustomTasks] = useState<any[]>([]);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "customTasks"), (snap) => {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+    const unsub = onSnapshot(query(collection(db, "customTasks"), where("businessId", "==", businessId)), (snap) => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
+
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+      // Fetch the owner/admin of this business for settings
+      const q = query(
+        collection(db, "users"), 
+        where("businessId", "==", businessId), 
+        where("role", "in", ["admin", "manager"]), 
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      } else {
+        setBusinessSettings(currentUserData);
+      }
+    };
+    fetchBusinessSettings();
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const form = useForm({
     resolver: zodResolver(invoiceSchema),
@@ -89,10 +115,15 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
   }, [initialData, form]);
 
   useEffect(() => {
-    if (!initialData?.id && !form.getValues("invoiceNumber")) {
+    if (!initialData?.id && !form.getValues("invoiceNumber") && currentUserData?.businessId) {
       const fetchLatestInvoiceNumber = async () => {
         try {
-          const q = query(collection(db, "invoices"), orderBy("invoiceNumber", "desc"), limit(1));
+          const q = query(
+            collection(db, "invoices"), 
+            where("businessId", "==", currentUserData.businessId),
+            orderBy("invoiceNumber", "desc"), 
+            limit(1)
+          );
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
             const latestInvoice = snapshot.docs[0].data();
@@ -111,7 +142,7 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
       };
       fetchLatestInvoiceNumber();
     }
-  }, [initialData, form]);
+  }, [initialData, form, currentUserData?.businessId]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -137,20 +168,12 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
     };
   }, [watchItems]);
 
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchBusinessSettings = async () => {
-      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        setBusinessSettings(snap.docs[0].data());
-      }
-    };
-    fetchBusinessSettings();
-  }, []);
+  // Removed redundant fetch
 
   async function onSubmit(values: InvoiceFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     setIsSubmitting(true);
     setEmailError(null);
     try {
@@ -163,6 +186,7 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
       // Data for Firestore (with Timestamps)
       const firestoreData = {
         ...values,
+        businessId,
         clientName,
         items: values.items.map(item => {
           const quantity = Number(item.quantity) || 0;
@@ -286,7 +310,7 @@ export function InvoiceForm({ initialData, onSuccess, onCancel }: InvoiceFormPro
               </div>
             </div>
           </div>
-          <div className="h-32 w-32 rounded-full bg-orange-400 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+          <div className="h-32 w-32 rounded-full flex items-center justify-center text-white font-bold text-xl overflow-hidden">
             {businessSettings?.businessLogo ? (
               <img src={businessSettings.businessLogo} className="h-full w-full object-contain p-4" referrerPolicy="no-referrer" />
             ) : (

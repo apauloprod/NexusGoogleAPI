@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, onSnapshot } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../../App";
 import { ClientSearchSelect } from "../ClientSearchSelect";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -40,6 +41,7 @@ interface RequestFormProps {
 const DEFAULT_SERVICES = ["Data Strategy", "AI Implementation", "Advanced Analytics", "Custom Dashboards"];
 
 export function RequestFormInternal({ initialData, onSuccess, onCancel }: RequestFormProps) {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientType, setClientType] = useState<"new" | "existing">(initialData?.clientId ? "existing" : "new");
   const [availableServices, setAvailableServices] = useState<string[]>(DEFAULT_SERVICES);
@@ -85,6 +87,9 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
   }, [selectedClientId, clientType, form]);
 
   async function onSubmit(values: RequestFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     setIsSubmitting(true);
     try {
       let finalClientId = values.clientId;
@@ -97,6 +102,7 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
           phone: values.phone,
           address: values.address,
           status: "potential", // New clients from requests are potential
+          businessId,
           createdAt: serverTimestamp(),
         });
         finalClientId = clientRef.id;
@@ -114,6 +120,7 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
           ...values,
           clientId: finalClientId,
           status: "pending",
+          businessId,
           createdAt: serverTimestamp(),
         });
       }

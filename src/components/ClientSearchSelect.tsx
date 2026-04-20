@@ -16,7 +16,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { db } from "../firebase"
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { AuthContext } from "../App"
+import { useContext } from "react"
 
 interface Client {
   id: string
@@ -28,15 +30,24 @@ interface ClientSearchSelectProps {
   value?: string
   onValueChange: (value: string) => void
   placeholder?: string
+  disabled?: boolean
 }
 
-export function ClientSearchSelect({ value, onValueChange, placeholder = "Select client..." }: ClientSearchSelectProps) {
+export function ClientSearchSelect({ value, onValueChange, placeholder = "Select client...", disabled }: ClientSearchSelectProps) {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [open, setOpen] = React.useState(false)
   const [clients, setClients] = React.useState<Client[]>([])
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
-    const q = query(collection(db, "clients"), orderBy("name", "asc"))
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const q = query(
+      collection(db, "clients"), 
+      where("businessId", "==", businessId),
+      orderBy("name", "asc")
+    )
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -47,7 +58,7 @@ export function ClientSearchSelect({ value, onValueChange, placeholder = "Select
       setLoading(false)
     })
     return () => unsubscribe()
-  }, [])
+  }, [currentUserData?.businessId, impersonatedUser?.businessId])
 
   const selectedClient = clients.find((client) => client.id === value)
 
@@ -58,6 +69,7 @@ export function ClientSearchSelect({ value, onValueChange, placeholder = "Select
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className="w-full justify-between bg-white/5 border-white/10 hover:bg-white/10 text-white font-normal"
         >
           {selectedClient ? selectedClient.name : placeholder}

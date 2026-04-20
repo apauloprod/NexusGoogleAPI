@@ -21,7 +21,7 @@ import { AuthContext } from "../../App";
 import { format } from "date-fns";
 
 const Messages = () => {
-  const { user } = useContext(AuthContext);
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [activeChat, setActiveChat] = useState<any>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -29,18 +29,28 @@ const Messages = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
-    // Fetch team members and clients as contacts
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+    // Fetch team members and clients as contacts within the same business
+    const unsubUsers = onSnapshot(query(
+      collection(db, "users"),
+      where("businessId", "==", businessId)
+    ), (snap) => {
       const users = snap.docs.map(d => ({ id: d.id, type: 'team', ...d.data() }));
       setContacts(prev => {
         const clients = prev.filter(c => c.type === 'client');
-        return [...users, ...clients];
+        // Filter out self
+        const effectiveUid = impersonatedUser?.uid || user.uid;
+        const team = users.filter(u => u.id !== effectiveUid);
+        return [...team, ...clients];
       });
     });
 
-    const unsubClients = onSnapshot(collection(db, "clients"), (snap) => {
+    const unsubClients = onSnapshot(query(
+      collection(db, "clients"),
+      where("businessId", "==", businessId)
+    ), (snap) => {
       const clients = snap.docs.map(d => ({ id: d.id, type: 'client', ...d.data() }));
       setContacts(prev => {
         const users = prev.filter(c => c.type === 'team');
@@ -52,14 +62,15 @@ const Messages = () => {
       unsubUsers();
       unsubClients();
     };
-  }, [user]);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId, impersonatedUser?.uid]);
 
   useEffect(() => {
     if (!activeChat || !user) return;
 
+    const effectiveUid = impersonatedUser?.uid || user.uid;
     const q = query(
       collection(db, "messages"),
-      where("conversationId", "==", [user.uid, activeChat.id].sort().join("_")),
+      where("conversationId", "==", [effectiveUid, activeChat.id].sort().join("_")),
       orderBy("createdAt", "asc")
     );
 
@@ -68,21 +79,26 @@ const Messages = () => {
     });
 
     return () => unsub();
-  }, [activeChat, user]);
+  }, [activeChat, user, impersonatedUser?.uid]);
 
   const handleSendMessage = async (type: 'chat' | 'email' | 'sms' = 'chat') => {
-    if (!newMessage.trim() || !activeChat || !user) {
-      console.warn("Cannot send message: check newMessage, activeChat, or user context", { newMessage, activeChat, userId: user?.uid });
+    if (!newMessage.trim() || !activeChat || !user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) {
+      console.warn("Cannot send message: check context", { newMessage, activeChat, userId: user?.uid });
       return;
     }
 
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+    const effectiveUid = impersonatedUser?.uid || user.uid;
+    const effectiveName = impersonatedUser?.displayName || user.displayName || user.email;
+
     try {
       console.log(`Attempting to send ${type} to ${activeChat.id}`);
-      const conversationId = [user.uid, activeChat.id].sort().join("_");
+      const conversationId = [effectiveUid, activeChat.id].sort().join("_");
       const docRef = await addDoc(collection(db, "messages"), {
         conversationId,
-        senderId: user.uid,
-        senderName: user.displayName || user.email,
+        businessId,
+        senderId: effectiveUid,
+        senderName: effectiveName,
         receiverId: activeChat.id,
         receiverName: activeChat.displayName || activeChat.name || activeChat.email,
         content: newMessage,

@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 
 
 const Jobs = () => {
-  const { user, impersonatedUser } = useContext(AuthContext);
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,38 +53,27 @@ const Jobs = () => {
       setSearchTerm(search);
     }
   }, [searchParams]);
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
-
   useEffect(() => {
-    if (!user) return;
-    const targetUid = impersonatedUser?.uid || user.uid;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
-    // Fetch user and business settings
-    const unsubUser = onSnapshot(doc(db, "users", targetUid), (snap) => {
-      setCurrentUserData(snap.data());
-    });
-
-    const unsubSettings = onSnapshot(query(collection(db, "users"), where("role", "==", "admin"), limit(1)), (snap) => {
-      if (!snap.empty) {
-        setBusinessSettings(snap.docs[0].data());
-      }
-    });
-
-    const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+    const q = query(
+      collection(db, "jobs"), 
+      where("businessId", "==", businessId),
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setJobs(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "jobs");
+      setLoading(false);
     });
-    return () => {
-      unsubUser();
-      unsubSettings();
-      unsubscribe();
-    };
-  }, []);
+
+    return () => unsubscribe();
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const convertToInvoice = async (job: any) => {
     setIsConverting(job.id);
@@ -190,10 +179,10 @@ const Jobs = () => {
 
     // Privacy Logic:
     const role = impersonatedUser?.role || currentUserData?.role || 'staff';
-    const visibility = businessSettings?.jobVisibility || 'all';
+    const visibility = currentUserData?.jobVisibility || 'all';
     const currentUserId = impersonatedUser?.uid || user?.uid;
 
-    if (role !== 'admin' && visibility === 'own') {
+    if (role !== 'admin' && role !== 'manager' && visibility === 'own') {
       return (job.assignedTeam || []).includes(currentUserId);
     }
 
@@ -213,12 +202,14 @@ const Jobs = () => {
           <p className="text-muted-foreground">Track ongoing work, checklists, and project progress.</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-              <Plus className="h-4 w-4" />
-              New Job
-            </Button>
-          </DialogTrigger>
+          {(impersonatedUser?.role || currentUserData?.role || 'team') !== 'team' && (
+            <DialogTrigger asChild>
+              <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                <Plus className="h-4 w-4" />
+                New Job
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Job</DialogTitle>
@@ -342,8 +333,8 @@ const Jobs = () => {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-6">
-                {(impersonatedUser?.role || currentUserData?.role) === 'admin' && (
+                  <div className="flex items-center gap-6">
+                {(impersonatedUser?.role || currentUserData?.role || 'team') !== 'team' && (
                   <div className="text-right">
                     <p className="text-lg font-bold text-white">
                       ${job.total?.toLocaleString() || "0.00"}
@@ -355,7 +346,7 @@ const Jobs = () => {
                 )}
                 <div className="h-8 w-px bg-white/5 mx-2" />
                 <div className="flex items-center gap-2">
-                  {job.status !== 'completed' && (
+                  {job.status !== 'completed' && (impersonatedUser?.role || currentUserData?.role || 'team') !== 'team' && (
                     <Button 
                       variant="ghost" 
                       size="sm" 

@@ -33,7 +33,7 @@ import { useContext } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, subDays, addWeeks, addMonths, startOfWeek, endOfWeek } from "date-fns";
 
 const Schedule = () => {
-  const { user, impersonatedUser } = useContext(AuthContext);
+  const { user, impersonatedUser, currentUserData } = useContext(AuthContext);
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -42,8 +42,6 @@ const Schedule = () => {
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'timeline'>('calendar');
   const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   const handleDelete = async () => {
     if (!itemToDelete) return;
@@ -57,22 +55,20 @@ const Schedule = () => {
   };
 
   useEffect(() => {
-    if (!user) return;
-    const targetUid = impersonatedUser?.uid || user.uid;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
-    // Fetch user and business settings
-    const unsubUser = onSnapshot(doc(db, "users", targetUid), (snap) => {
-      setCurrentUserData(snap.data());
-    });
-
-    const unsubSettings = onSnapshot(query(collection(db, "users"), where("role", "==", "admin"), limit(1)), (snap) => {
-      if (!snap.empty) {
-        setBusinessSettings(snap.docs[0].data());
-      }
-    });
-
-    const visitsQuery = query(collection(db, "visits"), orderBy("scheduledAt", "asc"));
-    const jobsQuery = query(collection(db, "jobs"), where("status", "==", "active"), orderBy("scheduledAt", "asc"));
+    const visitsQuery = query(
+      collection(db, "visits"), 
+      where("businessId", "==", businessId),
+      orderBy("scheduledAt", "asc")
+    );
+    const jobsQuery = query(
+      collection(db, "jobs"), 
+      where("businessId", "==", businessId),
+      where("status", "==", "active"),
+      orderBy("scheduledAt", "asc")
+    );
 
     const unsubscribeVisits = onSnapshot(visitsQuery, (snapshot) => {
       const visitsData = snapshot.docs.map(doc => ({ id: doc.id, type: 'visit', ...doc.data() }));
@@ -89,12 +85,10 @@ const Schedule = () => {
     });
 
     return () => {
-      unsubUser();
-      unsubSettings();
       unsubscribeVisits();
       unsubscribeJobs();
     };
-  }, []);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const updateSchedule = (data: any[], type: 'visits' | 'jobs') => {
     setScheduleData(prev => {
@@ -138,11 +132,11 @@ const Schedule = () => {
     }
     
     // Privacy Logic:
-    const role = currentUserData?.role || 'staff';
-    const visibility = businessSettings?.jobVisibility || 'all';
+    const role = impersonatedUser?.role || currentUserData?.role || 'team';
+    const visibility = currentUserData?.jobVisibility || 'all';
     const currentUserId = impersonatedUser?.uid || user?.uid;
 
-    if (role !== 'admin' && visibility === 'own') {
+    if (role !== 'admin' && role !== 'manager' && visibility === 'own') {
       if (item.type === 'job') {
         return isVisible && (item.assignedTeam || []).includes(currentUserId);
       }

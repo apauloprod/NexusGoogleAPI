@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
   Users, 
   Shield, 
@@ -7,7 +7,8 @@ import {
   Briefcase,
   ChevronRight,
   MoreVertical,
-  Activity
+  Activity,
+  UserPlus
 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, where, doc, updateDoc, getDoc } from "firebase/firestore";
@@ -19,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../firebase";
 import { cn } from "@/lib/utils";
+import { AuthContext } from "../../App";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const AdminControl = () => {
+  const { setImpersonatedUser } = useContext(AuthContext);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,15 +68,18 @@ const AdminControl = () => {
   const businessOwners = users.filter(u => u.role === 'admin');
   
   const getTeamMembers = (ownerId: string) => {
-    // Assuming team members have their owner's ID as businessId
-    return users.filter(u => u.role === 'team' && u.businessId === ownerId);
+    // Team members have their owner's ID or businessId
+    return users.filter(u => u.businessId === ownerId && u.id !== ownerId);
   };
 
-  const filteredOwners = businessOwners.filter(owner => 
-    owner.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    owner.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    owner.businessName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleImpersonate = (userItem: any) => {
+    setImpersonatedUser({
+      uid: userItem.id,
+      role: userItem.role,
+      businessId: userItem.businessId || userItem.id
+    });
+    navigate("/dashboard");
+  };
 
   const toggleRole = async (userId: string, currentRole: string) => {
     try {
@@ -176,6 +182,10 @@ const AdminControl = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-black border-white/10">
+                      <DropdownMenuItem onClick={() => handleImpersonate(userItem)}>
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Impersonate User
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => toggleRole(userItem.id, userItem.role)}>
                         {userItem.role === 'admin' ? "Demote to Team Member" : "Promote to Business Owner"}
                       </DropdownMenuItem>

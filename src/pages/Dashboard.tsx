@@ -39,7 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { db, auth, signInWithGoogle, logout, handleFirestoreError, OperationType } from "../firebase";
-import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, setDoc, serverTimestamp, where } from "firebase/firestore";
 import { AuthContext } from "../App";
 import { useContext, useMemo } from "react";
 
@@ -106,18 +106,26 @@ const Sidebar = ({
   location, 
   user, 
   logout,
-  userRole
-}: any) => (
-  <div className="flex flex-col h-full bg-black border-r border-white/5 w-64">
-    <div className="p-6 flex items-center gap-3">
-      <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center">
-        <div className="h-4 w-4 bg-black rounded-sm" />
-      </div>
-      <span className="text-xl font-bold tracking-tighter text-white">NEXUS</span>
-    </div>
+  userRole,
+  currentUserData,
+  impersonatedUser
+}: any) => {
+  const displayName = impersonatedUser?.displayName || currentUserData?.displayName || user?.displayName || "User";
+  const email = impersonatedUser?.email || currentUserData?.email || user?.email;
+  const photoURL = impersonatedUser?.photoURL || currentUserData?.photoURL || user?.photoURL;
+  const displayRole = impersonatedUser?.role || userRole;
 
-    <div className="px-4 mb-6">
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+  return (
+    <div className="flex flex-col h-full bg-black border-r border-white/5 w-64">
+      <div className="p-6 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center">
+          <div className="h-4 w-4 bg-black rounded-sm" />
+        </div>
+        <span className="text-xl font-bold tracking-tighter text-white">NEXUS</span>
+      </div>
+
+      <div className="px-4 mb-6">
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogTrigger asChild>
           <Button className="w-full bg-white text-black hover:bg-white/90 rounded-xl h-11 gap-2 font-bold">
             <Plus className="h-5 w-5" />
@@ -314,15 +322,16 @@ const Sidebar = ({
     <div className="p-4 border-t border-white/5">
       <div className="flex items-center gap-3 px-2 mb-4">
         <div className="h-9 w-9 rounded-full bg-gradient-to-br from-white/20 to-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-          {user?.photoURL ? (
-            <img src={user.photoURL} alt={user.displayName || ""} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+          {photoURL ? (
+            <img src={photoURL} alt={displayName} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
           ) : (
             <UserIcon className="h-5 w-5 text-white/50" />
           )}
         </div>
         <div className="flex-1 overflow-hidden">
-          <p className="text-sm font-bold text-white truncate">{user?.displayName || "User"}</p>
-          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          <p className="text-sm font-bold text-white truncate">{displayName}</p>
+          <p className="text-[10px] text-muted-foreground truncate uppercase tracking-wider font-bold mb-0.5">{displayRole}</p>
+          <p className="text-[10px] text-muted-foreground truncate opacity-50">{email}</p>
         </div>
       </div>
       <Button 
@@ -335,10 +344,11 @@ const Sidebar = ({
       </Button>
     </div>
   </div>
-);
+  );
+};
 
 export default function Dashboard() {
-  const { user, loading, impersonatedUser, setImpersonatedUser } = useContext(AuthContext);
+  const { user, loading, currentUserData, impersonatedUser, setImpersonatedUser } = useContext(AuthContext);
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -356,43 +366,66 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch team members for impersonation (admin only)
-    const unsubTeam = onSnapshot(collection(db, "users"), (snap) => {
-      setTeamMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    // Fetch or initialize user role
-    const userRef = doc(db, "users", user.uid);
-    const unsubUser = onSnapshot(userRef, async (snap) => {
-      if (snap.exists()) {
-        const role = impersonatedUser ? impersonatedUser.role : (snap.data().role || "team");
-        setUserRole(role as any);
-      } else {
-        // First time login - if it's the owner email, make admin
+    // Initialize businessId and role if it's a first-time login
+    const checkUser = async () => {
+      const userRef = doc(db, "users", user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
         const role = user.email === "apauloprod@gmail.com" ? "admin" : "team";
+        // If team member is invited, they might not be created yet, but addTeamMember creates them.
+        // If they sign in and don't exist, they are likely a new independent business manager/owner if not already in system.
+        // Actually, if they are not in the system, they should probably be 'admin' of their own new business.
         await setDoc(userRef, {
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
           role: role,
+          businessId: user.uid, // Their own business
           createdAt: serverTimestamp()
         });
-        setUserRole(role as any);
+      } else if (!snap.data().businessId) {
+        // Legacy support: add businessId if missing
+        await updateDoc(userRef, { businessId: user.uid });
       }
+    };
+    checkUser();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    // Fetch team members for this business
+    const teamQuery = query(collection(db, "users"), where("businessId", "==", businessId));
+    const unsubTeam = onSnapshot(teamQuery, (snap) => {
+      setTeamMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Fetch recent activities
-    const q = query(collection(db, "activities"), orderBy("createdAt", "desc"), limit(10));
-    const unsubActivities = onSnapshot(q, (snap) => {
+    // Handle role (impersonation or real)
+    const role = impersonatedUser ? impersonatedUser.role : (currentUserData.role || "team");
+    setUserRole(role as any);
+
+    // Fetch recent activities for this business
+    const activitiesQuery = query(
+      collection(db, "activities"), 
+      where("businessId", "==", businessId),
+      orderBy("createdAt", "desc"), 
+      limit(10)
+    );
+    const unsubActivities = onSnapshot(activitiesQuery, (snap) => {
       setActivities(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      if (error.code === 'failed-precondition') {
+        console.warn("Index required for activities businessId filtering.");
+      }
     });
 
     return () => {
       unsubTeam();
-      unsubUser();
       unsubActivities();
     };
-  }, [user, impersonatedUser]);
+  }, [user, currentUserData, impersonatedUser]);
 
   const menuItems = useMemo(() => {
     const baseItems = [
@@ -451,7 +484,7 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden">
       {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block h-full">
           <Sidebar 
             createDialogOpen={createDialogOpen}
             setCreateDialogOpen={setCreateDialogOpen}
@@ -462,11 +495,29 @@ export default function Dashboard() {
             user={user}
             logout={logout}
             userRole={userRole}
+            currentUserData={currentUserData}
+            impersonatedUser={impersonatedUser}
           />
         </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {impersonatedUser && (
+          <div className="bg-cyan-500/10 border-b border-cyan-500/20 px-6 py-2 flex items-center justify-between text-cyan-400">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Shield className="h-4 w-4" />
+              <span>Currently impersonating UID: <strong>{impersonatedUser.uid}</strong> ({impersonatedUser.role})</span>
+            </div>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="h-7 text-xs hover:bg-cyan-500/20 text-cyan-400 font-bold"
+              onClick={() => setImpersonatedUser(null)}
+            >
+              Stop Impersonating
+            </Button>
+          </div>
+        )}
         {/* Top Nav */}
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-black/50 backdrop-blur-xl z-10">
           <div className="flex items-center gap-4 flex-1">
@@ -487,6 +538,8 @@ export default function Dashboard() {
                   user={user}
                   logout={logout}
                   userRole={userRole}
+                  currentUserData={currentUserData}
+                  impersonatedUser={impersonatedUser}
                 />
               </SheetContent>
             </Sheet>
@@ -510,7 +563,11 @@ export default function Dashboard() {
                   } else {
                     const member = teamMembers.find(m => m.id === v);
                     if (member) {
-                      setImpersonatedUser({ uid: member.id, role: member.role });
+                      setImpersonatedUser({ 
+                        uid: member.id, 
+                        role: member.role,
+                        businessId: member.businessId || member.id // businessId for admins is usually their id
+                      });
                     }
                   }
                 }}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../../App";
 import { 
   Plus, 
   CreditCard,
@@ -15,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -28,10 +29,21 @@ import { PaymentForm } from "../../components/forms/PaymentForm";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 
 const Payments = () => {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
   const success = searchParams.get("success");
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +59,26 @@ const Payments = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const q = query(collection(db, "payments"), orderBy("createdAt", "desc"));
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const q = query(
+      collection(db, "payments"), 
+      where("businessId", "==", businessId),
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setPayments(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "payments");
+      setLoading(false);
     });
+
     return () => unsubscribe();
-  }, []);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const filteredPayments = payments.filter(payment => {
     return payment.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 

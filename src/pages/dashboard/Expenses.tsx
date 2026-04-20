@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -46,8 +46,21 @@ import {
   Pie
 } from "recharts";
 import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, isSameMonth } from "date-fns";
+import { AuthContext } from "../../App";
+import { useNavigate } from "react-router-dom";
 
 const Expenses = () => {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [timesheets, setTimesheets] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
@@ -65,23 +78,43 @@ const Expenses = () => {
   });
 
   useEffect(() => {
-    const unsubExpenses = onSnapshot(query(collection(db, "expenses"), orderBy("date", "desc")), (snap) => {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const unsubExpenses = onSnapshot(query(
+      collection(db, "expenses"), 
+      where("businessId", "==", businessId),
+      orderBy("date", "desc")
+    ), (snap) => {
       setExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubTimesheets = onSnapshot(query(collection(db, "timesheets"), where("submissionStatus", "==", "approved")), (snap) => {
+    const unsubTimesheets = onSnapshot(query(
+      collection(db, "timesheets"), 
+      where("businessId", "==", businessId),
+      where("submissionStatus", "==", "approved")
+    ), (snap) => {
       setTimesheets(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubQuotes = onSnapshot(collection(db, "quotes"), (snap) => {
+    const unsubQuotes = onSnapshot(query(
+      collection(db, "quotes"),
+      where("businessId", "==", businessId)
+    ), (snap) => {
       setQuotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubRequests = onSnapshot(collection(db, "requests"), (snap) => {
+    const unsubRequests = onSnapshot(query(
+      collection(db, "requests"),
+      where("businessId", "==", businessId)
+    ), (snap) => {
       setRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const unsubJobs = onSnapshot(collection(db, "jobs"), (snap) => {
+    const unsubJobs = onSnapshot(query(
+      collection(db, "jobs"),
+      where("businessId", "==", businessId)
+    ), (snap) => {
       setJobs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
@@ -93,14 +126,17 @@ const Expenses = () => {
       unsubRequests();
       unsubJobs();
     };
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     try {
       await addDoc(collection(db, "expenses"), {
         ...newExpense,
         amount: parseFloat(newExpense.amount),
+        businessId,
         date: Timestamp.fromDate(new Date(newExpense.date + "T12:00:00")),
         createdAt: serverTimestamp()
       });

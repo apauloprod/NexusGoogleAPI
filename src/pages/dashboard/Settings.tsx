@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, query, onSnapshot, doc, updateDoc, deleteDoc, getDoc, where, orderBy, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -48,8 +49,7 @@ import {
 } from "@/components/ui/dialog";
 
 const Settings = () => {
-  const { user, impersonatedUser } = useContext(AuthContext);
-  const [currentUserData, setCurrentUserData] = useState<any>(null);
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSeeding, setIsSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -67,6 +67,7 @@ const Settings = () => {
     businessLogo: "",
     hourlyRate: 0,
     jobVisibility: "all" as "all" | "own",
+    allowTeamSelfAssign: false,
     address: {
       street: "",
       city: "",
@@ -76,15 +77,13 @@ const Settings = () => {
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !currentUserData?.businessId) return;
     
-    // Get current user role
-    const unsubRole = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      setCurrentUserData(snap.data());
-    });
+    const businessId = currentUserData.businessId;
 
     // Fetch custom tasks
-    const unsubTasks = onSnapshot(collection(db, "customTasks"), (snap) => {
+    const tasksQuery = query(collection(db, "customTasks"), where("businessId", "==", businessId));
+    const unsubTasks = onSnapshot(tasksQuery, (snap) => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
@@ -98,24 +97,24 @@ const Settings = () => {
           businessLogo: data.businessLogo || "",
           hourlyRate: data.hourlyRate || 0,
           jobVisibility: data.jobVisibility || "all",
+          allowTeamSelfAssign: data.allowTeamSelfAssign || false,
           address: data.address || { street: "", city: "", postcode: "", country: "" }
         });
       }
     });
 
     // Fetch team members
-    const q = query(collection(db, "users"));
-    const unsubTeam = onSnapshot(q, (snap) => {
+    const teamQuery = query(collection(db, "users"), where("businessId", "==", businessId));
+    const unsubTeam = onSnapshot(teamQuery, (snap) => {
       setTeamMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
     return () => {
-      unsubRole();
       unsubTasks();
       unsubBusiness();
       unsubTeam();
     };
-  }, [user]);
+  }, [user, currentUserData?.businessId]);
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isAdmin = role === 'admin';
@@ -129,10 +128,11 @@ const Settings = () => {
   }, [isManagerOrAdmin, activeTab]);
 
   const addCustomTask = async () => {
-    if (!newTask.name) return;
+    if (!newTask.name || !currentUserData?.businessId) return;
     try {
       await addDoc(collection(db, "customTasks"), {
         ...newTask,
+        businessId: currentUserData.businessId,
         createdAt: serverTimestamp()
       });
       setNewTask({ name: "", description: "", defaultPrice: 0 });
@@ -205,12 +205,13 @@ const Settings = () => {
   };
 
   const addTeamMember = async () => {
-    if (!newMemberEmail || !newMemberName) return;
+    if (!newMemberEmail || !newMemberName || !currentUserData?.businessId) return;
     try {
       await addDoc(collection(db, "users"), {
         email: newMemberEmail,
         displayName: newMemberName,
         role: "team",
+        businessId: currentUserData.businessId,
         hourlyRate: 25, // Default rate
         createdAt: serverTimestamp()
       });
@@ -506,6 +507,19 @@ const Settings = () => {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">Controls what team members see in the Jobs and Schedule pages.</p>
+                  </div>
+                )}
+
+                {isManagerOrAdmin && (
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-bold">Team Self-Assignment</Label>
+                      <p className="text-[10px] text-muted-foreground italic">Allow team members to assign themselves to jobs</p>
+                    </div>
+                    <Checkbox 
+                      checked={businessData.allowTeamSelfAssign}
+                      onCheckedChange={(checked) => setBusinessData({...businessData, allowTeamSelfAssign: !!checked})}
+                    />
                   </div>
                 )}
               </div>

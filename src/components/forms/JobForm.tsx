@@ -54,33 +54,60 @@ interface JobFormProps {
 import { SchedulePicker } from "../SchedulePicker";
 
 export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
-  const { user, impersonatedUser } = useContext(AuthContext);
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableTeam, setAvailableTeam] = useState<any[]>([]);
   const [teamSearch, setTeamSearch] = useState("");
   const [customTasks, setCustomTasks] = useState<any[]>([]);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   useEffect(() => {
-    // Filter out super admin from the list
-    const q = query(collection(db, "users"), where("email", "!=", "apauloprod@gmail.com"));
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    // Fetch team members for this business
+    const q = query(
+      collection(db, "users"), 
+      where("businessId", "==", businessId),
+      where("email", "!=", "apauloprod@gmail.com")
+    );
     getDocs(q).then(snap => {
       setAvailableTeam(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    onSnapshot(collection(db, "customTasks"), (snap) => {
+    onSnapshot(query(collection(db, "customTasks"), where("businessId", "==", businessId)), (snap) => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-  }, []);
 
-  const currentRole = impersonatedUser?.role || (availableTeam.find(u => u.id === user?.uid)?.role) || 'team';
+    // Fetch business settings (from owner's document)
+    // Business ID is the owner's UID
+    getDoc(doc(db, "users", businessId)).then(snap => {
+      if (snap.exists()) {
+        setBusinessSettings(snap.data());
+      }
+    });
+
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
+
+  const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
   const currentUserId = impersonatedUser?.uid || user?.uid;
 
   const filteredTeam = availableTeam.filter(m => {
     const matchesSearch = (m.displayName || m.email || "").toLowerCase().includes(teamSearch.toLowerCase());
     
-    // Role-based filtering
+    // Role-based filtering: Team members can ONLY see themselves IF self-assign is allowed OR if they are already assigned
     if (currentRole === 'team') {
-      return matchesSearch && m.id === currentUserId;
+      const isSelf = m.id === currentUserId;
+      const isAssigned = initialData?.assignedTeam?.includes(m.id);
+      
+      if (businessSettings?.allowTeamSelfAssign) {
+        // Can see themselves to toggle assignment, plus anyone already assigned to see the team
+        return matchesSearch && (isSelf || isAssigned);
+      }
+      
+      // If not allowed to self-assign, only show who is already assigned (read-only view of team)
+      return matchesSearch && isAssigned;
     }
     
     return matchesSearch;
@@ -111,6 +138,8 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
   const total = watchItems?.reduce((sum, item) => sum + (Number(item.price) || 0), 0) || 0;
 
   async function onSubmit(values: JobFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     setIsSubmitting(true);
     try {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
@@ -118,6 +147,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       
       const jobData = {
         ...values,
+        businessId,
         clientName,
         total,
         scheduledAt: values.scheduledAt ? Timestamp.fromDate(new Date(values.scheduledAt)) : null,
@@ -131,8 +161,9 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         // Log activity
         await addDoc(collection(db, "activities"), {
           description: `Updated job: ${values.title}`,
-          userName: auth.currentUser?.displayName || "User",
-          userId: auth.currentUser?.uid,
+          userName: impersonatedUser?.displayName || currentUserData?.displayName || auth.currentUser?.displayName || "User",
+          userId: currentUserId,
+          businessId,
           createdAt: serverTimestamp()
         });
       } else {
@@ -146,8 +177,9 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         // Log activity
         await addDoc(collection(db, "activities"), {
           description: `Created new job: ${values.title}`,
-          userName: auth.currentUser?.displayName || "User",
-          userId: auth.currentUser?.uid,
+          userName: impersonatedUser?.displayName || currentUserData?.displayName || "User",
+          userId: currentUserId,
+          businessId,
           createdAt: serverTimestamp()
         });
 
@@ -177,7 +209,12 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             <FormItem>
               <FormLabel>Job Title</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Q4 Data Migration" {...field} className="bg-white/5 border-white/10" />
+                <Input 
+                  placeholder="e.g. Q4 Data Migration" 
+                  {...field} 
+                  className="bg-white/5 border-white/10" 
+                  disabled={!isManagerOrAdmin}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -197,6 +234,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     onChange={field.onChange} 
                     placeholder="Select a time slot..."
                     excludeId={initialData?.id}
+                    disabled={!isManagerOrAdmin}
                   />
                 </FormControl>
                 <FormMessage />
@@ -209,7 +247,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Duration</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!isManagerOrAdmin}>
                   <FormControl>
                     <SelectTrigger className="bg-white/5 border-white/10">
                       <SelectValue placeholder="Select duration" />
@@ -241,6 +279,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     value={field.value} 
                     onValueChange={field.onChange} 
                     placeholder="Search for a client..."
+                    disabled={!isManagerOrAdmin}
                   />
                 </FormControl>
                 <FormMessage />
@@ -253,7 +292,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Status</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!isManagerOrAdmin}>
                   <FormControl>
                     <SelectTrigger className="bg-white/5 border-white/10">
                       <SelectValue placeholder="Select status" />
@@ -275,7 +314,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
           <div className="flex items-center justify-between">
             <FormLabel>Services / Items</FormLabel>
             <div className="flex gap-2">
-              {customTasks.length > 0 && (
+              {isManagerOrAdmin && customTasks.length > 0 && (
                 <Select onValueChange={(val) => {
                   const task = customTasks.find(t => t.id === val);
                   if (task) append({ description: task.name, price: task.defaultPrice });
@@ -290,15 +329,17 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                   </SelectContent>
                 </Select>
               )}
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                className="h-8 border-white/10 hover:bg-white/5"
-                onClick={() => append({ description: "", price: 0 })}
-              >
-                <Plus className="h-3 w-3 mr-1" /> Add Service
-              </Button>
+              {isManagerOrAdmin && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 border-white/10 hover:bg-white/5"
+                  onClick={() => append({ description: "", price: 0 })}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Add Service
+                </Button>
+              )}
             </div>
           </div>
           
@@ -311,9 +352,14 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     name={`items.${index}.description`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormControl>
-                          <Input placeholder="Service description" {...field} className="bg-white/5 border-white/10" />
-                        </FormControl>
+                <FormControl>
+                  <Input 
+                    placeholder="Service description" 
+                    {...field} 
+                    className="bg-white/5 border-white/10" 
+                    disabled={!isManagerOrAdmin}
+                  />
+                </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -325,9 +371,15 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     name={`items.${index}.price`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormControl>
-                          <Input type="number" placeholder="Price" {...field} className="bg-white/5 border-white/10" />
-                        </FormControl>
+                <FormControl>
+                  <Input 
+                    type="number" 
+                    placeholder="Price" 
+                    {...field} 
+                    className="bg-white/5 border-white/10" 
+                    disabled={!isManagerOrAdmin}
+                  />
+                </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -367,6 +419,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                   placeholder="Scope of work, requirements, etc..." 
                   {...field} 
                   className="bg-white/5 border-white/10 min-h-[100px]" 
+                  disabled={!isManagerOrAdmin}
                 />
               </FormControl>
               <FormMessage />
@@ -381,6 +434,11 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
               {form.watch("assignedTeam")?.length || 0} Selected
             </Badge>
           </div>
+          
+          {currentRole === 'team' && !businessSettings?.allowTeamSelfAssign && (
+            <p className="text-[10px] text-red-400 italic">Self-assignment is disabled by business owner.</p>
+          )}
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -388,6 +446,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
               className="pl-10 bg-white/5 border-white/10 h-10 rounded-xl"
               value={teamSearch}
               onChange={(e) => setTeamSearch(e.target.value)}
+              disabled={currentRole === 'team' && !businessSettings?.allowTeamSelfAssign}
             />
           </div>
           <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto p-1">
@@ -402,9 +461,15 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     "h-auto py-2 px-3 rounded-2xl border-white/10 transition-all duration-300",
                     isSelected 
                       ? "bg-blue-500/20 border-blue-500/50 text-blue-400 ring-2 ring-blue-500/20" 
-                      : "bg-white/5 hover:bg-white/10"
+                      : "bg-white/5 hover:bg-white/10",
+                    !(isManagerOrAdmin || (member.id === currentUserId && businessSettings?.allowTeamSelfAssign)) && "opacity-50 cursor-not-allowed"
                   )}
                   onClick={() => {
+                    const isSelf = member.id === currentUserId;
+                    const canToggle = isManagerOrAdmin || (isSelf && businessSettings?.allowTeamSelfAssign);
+                    
+                    if (!canToggle) return;
+
                     const current = form.getValues("assignedTeam") || [];
                     if (current.includes(member.id)) {
                       form.setValue("assignedTeam", current.filter(id => id !== member.id));

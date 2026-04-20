@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   MessageSquare, 
@@ -11,9 +11,11 @@ import {
   Users
 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, where, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, where, Timestamp, orderBy } from "firebase/firestore";
+import { AuthContext } from "../../App";
 
 export default function Overview() {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     pendingRequests: 0,
@@ -24,15 +26,18 @@ export default function Overview() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     // Listen to requests
-    const qRequests = query(collection(db, "requests"));
+    const qRequests = query(collection(db, "requests"), where("businessId", "==", businessId));
     const unsubRequests = onSnapshot(qRequests, (snapshot) => {
       const pending = snapshot.docs.filter(doc => doc.data().status === "pending").length;
       setStats(prev => ({ ...prev, pendingRequests: pending }));
     });
 
     // Listen to jobs for active count and revenue
-    const qJobs = query(collection(db, "jobs"));
+    const qJobs = query(collection(db, "jobs"), where("businessId", "==", businessId));
     const unsubJobs = onSnapshot(qJobs, (snapshot) => {
       const docs = snapshot.docs.map(doc => doc.data());
       const active = docs.filter(job => job.status === "active").length;
@@ -54,7 +59,7 @@ export default function Overview() {
     });
 
     // Listen to invoices
-    const qInvoices = query(collection(db, "invoices"));
+    const qInvoices = query(collection(db, "invoices"), where("businessId", "==", businessId));
     const unsubInvoices = onSnapshot(qInvoices, (snapshot) => {
       const unpaid = snapshot.docs.filter(doc => doc.data().status !== "paid").length;
       setStats(prev => ({ ...prev, unpaidInvoices: unpaid }));
@@ -65,7 +70,12 @@ export default function Overview() {
       unsubJobs();
       unsubInvoices();
     };
-  }, []);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isManagerOrAdmin = isAdmin || isManager;
 
   const statCards = [
     { 
@@ -73,37 +83,41 @@ export default function Overview() {
       value: stats.pendingRequests.toString(), 
       icon: MessageSquare, 
       color: "text-blue-400",
-      path: "/dashboard/requests"
+      path: "/dashboard/requests",
+      adminOnly: true
     },
     { 
       label: "Active Jobs", 
       value: stats.activeJobs.toString(), 
       icon: CheckSquare, 
       color: "text-emerald-400",
-      path: "/dashboard/jobs"
+      path: "/dashboard/jobs",
+      adminOnly: false
     },
     { 
       label: "Unpaid Invoices", 
       value: stats.unpaidInvoices.toString(), 
       icon: FileText, 
       color: "text-amber-400",
-      path: "/dashboard/invoices"
+      path: "/dashboard/invoices",
+      adminOnly: true
     },
     { 
       label: "Revenue (MTD)", 
       value: `$${stats.revenueMTD.toLocaleString()}`, 
       icon: CreditCard, 
       color: "text-purple-400",
-      path: "/dashboard/payments"
+      path: "/dashboard/payments",
+      adminOnly: true
     },
-  ];
+  ].filter(card => !card.adminOnly || isManagerOrAdmin);
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tighter">Welcome back, Owner</h1>
-          <p className="text-muted-foreground">Here's what's happening with your business today.</p>
+          <h1 className="text-3xl font-bold tracking-tighter">Welcome back, {impersonatedUser?.displayName || currentUserData?.displayName || "User"}</h1>
+          <p className="text-muted-foreground">{isManagerOrAdmin ? "Here's what's happening with your business today." : "Here's your schedule and ongoing work overview."}</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground glass px-4 py-2 rounded-xl border-white/5">
           <Clock className="h-4 w-4" />
@@ -138,24 +152,36 @@ export default function Overview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="p-8 rounded-[2rem] glass border-white/5 relative overflow-hidden">
-            <div className="relative z-10">
-              <h3 className="text-xl font-bold mb-2">Business Growth</h3>
-              <p className="text-muted-foreground mb-8 text-sm">Your revenue is up 15% compared to last month.</p>
-              <div className="h-64 flex items-end gap-2">
-                {[40, 60, 45, 90, 65, 80, 100].map((height, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div 
-                      className="w-full bg-gradient-to-t from-white/5 to-white/20 rounded-t-lg transition-all duration-500 group-hover:to-white/40" 
-                      style={{ height: `${height}%` }}
-                    />
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Day {i + 1}</span>
-                  </div>
-                ))}
+          {isManagerOrAdmin ? (
+            <div className="p-8 rounded-[2rem] glass border-white/5 relative overflow-hidden">
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold mb-2">Business Growth</h3>
+                <p className="text-muted-foreground mb-8 text-sm">Your revenue is up 15% compared to last month.</p>
+                <div className="h-64 flex items-end gap-2">
+                  {[40, 60, 45, 90, 65, 80, 100].map((height, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                      <div 
+                        className="w-full bg-gradient-to-t from-white/5 to-white/20 rounded-t-lg transition-all duration-500 group-hover:to-white/40" 
+                        style={{ height: `${height}%` }}
+                      />
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Day {i + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 bg-white/5 rounded-full blur-3xl" />
+            </div>
+          ) : (
+            <div className="p-8 rounded-[2rem] glass border-white/5">
+              <h3 className="text-xl font-bold mb-4">Your Recent Activity</h3>
+              <p className="text-muted-foreground text-sm">Stay on top of your assigned tasks and updates.</p>
+              {/* Could add a list of recently updated jobs for the user here */}
+              <div className="mt-8 h-48 border border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center opacity-50">
+                <Clock className="h-8 w-8 mb-4" />
+                <p className="text-sm">Activity feed coming soon</p>
               </div>
             </div>
-            <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 bg-white/5 rounded-full blur-3xl" />
-          </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -172,20 +198,24 @@ export default function Overview() {
                 View Schedule
                 <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
               </button>
-              <button 
-                onClick={() => navigate("/dashboard/clients")}
-                className="w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left text-sm font-medium flex items-center justify-between group"
-              >
-                Manage Clients
-                <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
-              </button>
-              <button 
-                onClick={() => navigate("/dashboard/marketing")}
-                className="w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left text-sm font-medium flex items-center justify-between group"
-              >
-                AI Marketing
-                <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
-              </button>
+              {isManagerOrAdmin && (
+                <>
+                  <button 
+                    onClick={() => navigate("/dashboard/clients")}
+                    className="w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left text-sm font-medium flex items-center justify-between group"
+                  >
+                    Manage Clients
+                    <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
+                  </button>
+                  <button 
+                    onClick={() => navigate("/dashboard/marketing")}
+                    className="w-full p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left text-sm font-medium flex items-center justify-between group"
+                  >
+                    AI Marketing
+                    <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

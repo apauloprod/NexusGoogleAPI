@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../../App";
 
 const visitSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters"),
@@ -44,7 +45,11 @@ import { ClientSearchSelect } from "../ClientSearchSelect";
 import { SchedulePicker } from "../SchedulePicker";
 
 export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
 
   useEffect(() => {
     // We still need to fetch clients if we want to auto-fill the address
@@ -81,6 +86,9 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
   }, [selectedClientId, form]);
 
   async function onSubmit(values: VisitFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     setIsSubmitting(true);
     try {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
@@ -97,6 +105,7 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
       } else {
         await addDoc(collection(db, "visits"), {
           ...values,
+          businessId,
           clientName,
           status: "scheduled",
           scheduledAt: new Date(values.scheduledAt),
@@ -122,7 +131,12 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
             <FormItem>
               <FormLabel>Visit Title</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. On-site Consultation" {...field} className="bg-white/5 border-white/10" />
+                <Input 
+                  placeholder="e.g. On-site Consultation" 
+                  {...field} 
+                  className="bg-white/5 border-white/10" 
+                  disabled={!isManagerOrAdmin}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -140,6 +154,7 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
                   value={field.value} 
                   onValueChange={field.onChange} 
                   placeholder="Search for a client..."
+                  disabled={!isManagerOrAdmin}
                 />
               </FormControl>
               <FormMessage />
@@ -154,7 +169,12 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
             <FormItem>
               <FormLabel>Location Address</FormLabel>
               <FormControl>
-                <Input placeholder="123 Main St, City, State" {...field} className="bg-white/5 border-white/10" />
+                <Input 
+                  placeholder="123 Main St, City, State" 
+                  {...field} 
+                  className="bg-white/5 border-white/10" 
+                  disabled={!isManagerOrAdmin}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -172,6 +192,7 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
                   value={field.value} 
                   onChange={field.onChange} 
                   placeholder="Select a time slot..."
+                  disabled={!isManagerOrAdmin}
                 />
               </FormControl>
               <FormMessage />
@@ -190,6 +211,7 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
                   placeholder="Any specific instructions for this visit..." 
                   {...field} 
                   className="bg-white/5 border-white/10 min-h-[100px]" 
+                  disabled={!isManagerOrAdmin}
                 />
               </FormControl>
               <FormMessage />
@@ -199,11 +221,13 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
+            {isManagerOrAdmin ? "Cancel" : "Close"}
           </Button>
-          <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? (initialData?.id ? "Updating..." : "Scheduling...") : (initialData?.id ? "Update Visit" : "Schedule Visit")}
-          </Button>
+          {isManagerOrAdmin && (
+            <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Scheduling...") : (initialData?.id ? "Update Visit" : "Schedule Visit")}
+            </Button>
+          )}
         </div>
       </form>
     </Form>

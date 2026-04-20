@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
   format, 
   addMinutes, 
@@ -18,15 +18,18 @@ import { Calendar as CalendarIcon, Clock, Check, AlertCircle } from "lucide-reac
 import { db } from "../firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AuthContext } from "../App";
 
 interface SchedulePickerProps {
   value?: string; // ISO string
   onChange: (value: string) => void;
   placeholder?: string;
   excludeId?: string;
+  disabled?: boolean;
 }
 
-export function SchedulePicker({ value, onChange, placeholder = "Select date and time", excludeId }: SchedulePickerProps) {
+export function SchedulePicker({ value, onChange, placeholder = "Select date and time", excludeId, disabled }: SchedulePickerProps) {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [date, setDate] = useState<Date | undefined>(() => {
     if (!value) return undefined;
     const d = new Date(value);
@@ -58,9 +61,12 @@ export function SchedulePicker({ value, onChange, placeholder = "Select date and
     if (date) {
       fetchBusySlots(date);
     }
-  }, [date]);
+  }, [date, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   async function fetchBusySlots(selectedDate: Date) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     setLoading(true);
     try {
       const start = startOfDay(selectedDate);
@@ -68,12 +74,14 @@ export function SchedulePicker({ value, onChange, placeholder = "Select date and
 
       const visitsQuery = query(
         collection(db, "visits"),
+        where("businessId", "==", businessId),
         where("scheduledAt", ">=", Timestamp.fromDate(start)),
         where("scheduledAt", "<=", Timestamp.fromDate(end))
       );
 
       const jobsQuery = query(
         collection(db, "jobs"),
+        where("businessId", "==", businessId),
         where("status", "==", "active"),
         where("scheduledAt", ">=", Timestamp.fromDate(start)),
         where("scheduledAt", "<=", Timestamp.fromDate(end))
@@ -165,6 +173,7 @@ export function SchedulePicker({ value, onChange, placeholder = "Select date and
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          disabled={disabled}
           className={cn(
             "w-full justify-start text-left font-normal bg-white/5 border-white/10 hover:bg-white/10",
             !date && "text-muted-foreground"

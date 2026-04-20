@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../../App";
+import { useNavigate } from "react-router-dom";
 import { 
   Plus, 
   Users,
@@ -14,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc, where } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -26,6 +28,17 @@ import {
 import { ClientForm } from "../../components/forms/ClientForm";
 
 const Clients = () => {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,16 +57,26 @@ const Clients = () => {
   };
 
   useEffect(() => {
-    const q = query(collection(db, "clients"), orderBy("name", "asc"));
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const q = query(
+      collection(db, "clients"), 
+      where("businessId", "==", businessId),
+      orderBy("name", "asc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "clients");
+      setLoading(false);
     });
+
     return () => unsubscribe();
-  }, []);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const filteredClients = clients.filter(client => 
     client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||

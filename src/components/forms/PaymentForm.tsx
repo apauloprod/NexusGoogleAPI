@@ -19,10 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, increment } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, increment, where } from "firebase/firestore";
+import { useState, useEffect, useContext } from "react";
 import { Check, ChevronsUpDown, CreditCard as StripeIcon, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AuthContext } from "../../App";
 import {
   Command,
   CommandEmpty,
@@ -53,14 +54,21 @@ interface PaymentFormProps {
 }
 
 export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormProps) {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     async function fetchInvoices() {
+      if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
       try {
-        const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
+        const q = query(
+          collection(db, "invoices"), 
+          where("businessId", "==", businessId),
+          orderBy("createdAt", "desc")
+        );
         const snapshot = await getDocs(q);
         setInvoices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
@@ -68,7 +76,7 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
       }
     }
     fetchInvoices();
-  }, []);
+  }, [currentUserData?.businessId]);
 
   const form = useForm({
     resolver: zodResolver(paymentSchema),
@@ -81,6 +89,8 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
   });
 
   async function onSubmit(values: PaymentFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     setIsSubmitting(true);
     try {
       const selectedInvoice = invoices.find(i => i.id === values.invoiceId);
@@ -103,6 +113,7 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
       } else {
         await addDoc(collection(db, "payments"), {
           ...values,
+          businessId,
           clientName: selectedInvoice?.clientName || "Unknown Client",
           invoiceNumber: selectedInvoice?.invoiceNumber || "Unknown",
           status: "success",

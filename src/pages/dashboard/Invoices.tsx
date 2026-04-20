@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { 
   Plus, 
   FileText,
@@ -32,8 +32,24 @@ import { InvoiceForm } from "../../components/forms/InvoiceForm";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import { AuthContext } from "../../App";
+import { useContext } from "react";
+
+
+
 const Invoices = () => {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -50,16 +66,26 @@ const Invoices = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    const q = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const q = query(
+      collection(db, "invoices"), 
+      where("businessId", "==", businessId),
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setInvoices(data);
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, "invoices");
+      setLoading(false);
     });
+
     return () => unsubscribe();
-  }, []);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const sendInvoiceEmail = async (inv: any) => {
     setIsSending(inv.id);

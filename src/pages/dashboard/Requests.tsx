@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
   Plus, 
   ArrowUpRight,
@@ -9,7 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { AuthContext } from "../../App";
+import { useNavigate } from "react-router-dom";
 
 import { 
   Dialog,
@@ -20,9 +22,21 @@ import {
 } from "@/components/ui/dialog";
 import { RequestFormInternal } from "../../components/forms/RequestFormInternal";
 import { QuoteForm } from "../../components/forms/QuoteForm";
-import { updateDoc, doc, getDocs, where, query as firestoreQuery, addDoc, serverTimestamp } from "firebase/firestore";
+import { updateDoc, doc, getDocs, query as firestoreQuery, addDoc, serverTimestamp } from "firebase/firestore";
 
 const Requests = () => {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
+
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -30,7 +44,14 @@ const Requests = () => {
   const [convertingRequest, setConvertingRequest] = useState<any>(null);
 
   useEffect(() => {
-    const q = query(collection(db, "requests"), orderBy("createdAt", "desc"));
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const q = query(
+      collection(db, "requests"), 
+      where("businessId", "==", businessId),
+      orderBy("createdAt", "desc")
+    );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setRequests(data);
@@ -39,12 +60,19 @@ const Requests = () => {
       handleFirestoreError(error, OperationType.LIST, "requests");
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const handleConvertToQuote = async (request: any) => {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     // 1. Try to find existing client by email
     const clientsRef = collection(db, "clients");
-    const q = firestoreQuery(clientsRef, where("email", "==", request.email));
+    const q = firestoreQuery(
+      clientsRef, 
+      where("email", "==", request.email),
+      where("businessId", "==", businessId)
+    );
     const snapshot = await getDocs(q);
     
     let clientId = "";
@@ -53,6 +81,7 @@ const Requests = () => {
     } else {
       // 2. Create new client if not found
       const newClientRef = await addDoc(collection(db, "clients"), {
+        businessId,
         name: request.name,
         email: request.email,
         phone: request.phone,

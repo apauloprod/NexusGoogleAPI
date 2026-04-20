@@ -1,7 +1,8 @@
 import { useEffect, useState, createContext, useContext } from "react";
 import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import RequestForm from "./pages/RequestForm";
@@ -12,11 +13,15 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 export const AuthContext = createContext<{ 
   user: User | null; 
   loading: boolean;
-  impersonatedUser: { uid: string; role: string } | null;
-  setImpersonatedUser: (user: { uid: string; role: string } | null) => void;
+  currentUserData: any | null;
+  setCurrentUserData: (data: any | null) => void;
+  impersonatedUser: { uid: string; role: string; businessId: string } | null;
+  setImpersonatedUser: (user: { uid: string; role: string; businessId: string } | null) => void;
 }>({ 
   user: null, 
   loading: true,
+  currentUserData: null,
+  setCurrentUserData: () => {},
   impersonatedUser: null,
   setImpersonatedUser: () => {}
 });
@@ -24,20 +29,40 @@ export const AuthContext = createContext<{
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [impersonatedUser, setImpersonatedUser] = useState<{ uid: string; role: string } | null>(null);
+  const [currentUserData, setCurrentUserData] = useState<any | null>(null);
+  const [impersonatedUser, setImpersonatedUser] = useState<{ uid: string; role: string; businessId: string } | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
+    let unsubUserDoc: (() => void) | null = null;
+
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        unsubUserDoc = onSnapshot(doc(db, "users", authUser.uid), (snap) => {
+          if (snap.exists()) {
+            setCurrentUserData({ id: snap.id, ...snap.data() });
+          } else {
+            setCurrentUserData(null);
+          }
+          setLoading(false);
+        });
+      } else {
+        if (unsubUserDoc) unsubUserDoc();
+        setCurrentUserData(null);
+        setLoading(false);
+      }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (unsubUserDoc) unsubUserDoc();
+    };
   }, []);
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={{ user, loading, impersonatedUser, setImpersonatedUser }}>
+      <AuthContext.Provider value={{ user, loading, currentUserData, setCurrentUserData, impersonatedUser, setImpersonatedUser }}>
         <Router>
           <Routes>
             <Route path="/" element={<LandingPage />} />

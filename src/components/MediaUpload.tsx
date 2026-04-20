@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { storage, db, handleFirestoreError, OperationType } from "../firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore";
+import { AuthContext } from "../App";
 
 interface MediaUploadProps {
   jobId: string;
@@ -19,6 +20,10 @@ interface MediaUploadProps {
 }
 
 export const MediaUpload: React.FC<MediaUploadProps> = ({ jobId, onClose }) => {
+  const { currentUserData, impersonatedUser } = React.useContext(AuthContext);
+  const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
+
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [existingMedia, setExistingMedia] = useState<any[]>([]);
@@ -133,14 +138,16 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({ jobId, onClose }) => {
                 <img src={item.url} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               )}
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="text-white hover:text-red-400"
-                  onClick={() => deleteMedia(item)}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </Button>
+                {isManagerOrAdmin && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white hover:text-red-400"
+                    onClick={() => deleteMedia(item)}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                )}
               </div>
             </div>
           ))

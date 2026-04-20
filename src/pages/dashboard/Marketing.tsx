@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
   Sparkles, 
   Play, 
@@ -19,10 +19,23 @@ import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
 import { motion, AnimatePresence } from "motion/react";
 import { GoogleGenAI, Type } from "@google/genai";
+import { AuthContext } from "../../App";
+import { useNavigate } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
 const Marketing = () => {
+  const { currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  useEffect(() => {
+    if (!isManagerOrAdmin) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, navigate]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -73,8 +86,12 @@ const Marketing = () => {
   };
 
   useEffect(() => {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     const q = query(
       collection(db, "jobs"), 
+      where("businessId", "==", businessId),
       where("status", "==", "completed"),
       orderBy("updatedAt", "desc")
     );
@@ -86,7 +103,7 @@ const Marketing = () => {
       handleFirestoreError(error, OperationType.LIST, "jobs");
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const generateMontage = async (job: any) => {
     setIsGenerating(true);

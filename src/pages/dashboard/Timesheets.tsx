@@ -49,7 +49,7 @@ import { AuthContext } from "../../App";
 import { format, differenceInMinutes, addDays, parseISO } from "date-fns";
 
 const Timesheets = () => {
-  const { user, impersonatedUser } = useContext(AuthContext);
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [entries, setEntries] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [activeEntry, setActiveEntry] = useState<any>(null);
@@ -77,62 +77,60 @@ const Timesheets = () => {
     userId: ""
   });
 
+  const role = (impersonatedUser?.role || currentUserData?.role || 'team') as "admin" | "manager" | "team";
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
   useEffect(() => {
-    if (!user) return;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     const targetUid = impersonatedUser?.uid || user.uid;
 
-    // Get user role and hourly rate
-    const unsubUser = onSnapshot(doc(db, "users", targetUid), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        const role = impersonatedUser?.role || data.role;
-        setUserRole(role);
-        setHourlyRate(data.hourlyRate || 0);
-        
-        if (role === 'admin') {
-          // Fetch all team members for assignment, excluding super admin
-          const qTeam = query(collection(db, "users"), where("email", "!=", "apauloprod@gmail.com"));
-          onSnapshot(qTeam, (teamSnap) => {
-            setTeamMembers(teamSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-          });
-        }
-      }
-    });
+    setUserRole(role);
+    setHourlyRate(currentUserData.hourlyRate || 0);
 
-    // Get timesheets
-    const unsubRoleCheck = onSnapshot(doc(db, "users", targetUid), (userSnap) => {
-      const data = userSnap.data();
-      const role = impersonatedUser?.role || data?.role;
-      let finalQuery = query(collection(db, "timesheets"), orderBy("startTime", "desc"));
-      
-      if (role !== 'admin') {
-        finalQuery = query(
-          collection(db, "timesheets"), 
-          where("userId", "==", targetUid),
-          orderBy("startTime", "desc")
-        );
-      }
-
-      const unsub = onSnapshot(finalQuery, (snap) => {
-        const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        setEntries(docs);
-        setActiveEntry(docs.find((d: any) => d.status === 'active'));
-        setLoading(false);
-      }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, "timesheets");
+    // Fetch team members for this business
+    if (role === 'admin' || role === 'manager') {
+      const qTeam = query(
+        collection(db, "users"), 
+        where("businessId", "==", businessId),
+        where("email", "!=", "apauloprod@gmail.com")
+      );
+      onSnapshot(qTeam, (teamSnap) => {
+        setTeamMembers(teamSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
+    }
 
-      return unsub;
+    // Get timesheets for this business
+    let finalQuery = query(
+      collection(db, "timesheets"), 
+      where("businessId", "==", businessId),
+      orderBy("startTime", "desc")
+    );
+    
+    if (role === 'team') {
+      finalQuery = query(
+        collection(db, "timesheets"), 
+        where("businessId", "==", businessId),
+        where("userId", "==", targetUid),
+        orderBy("startTime", "desc")
+      );
+    }
+
+    const unsub = onSnapshot(finalQuery, (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setEntries(docs);
+      setActiveEntry(docs.find((d: any) => d.status === 'active'));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, "timesheets");
     });
 
-    return () => {
-      unsubUser();
-      unsubRoleCheck();
-    };
-  }, [user, impersonatedUser]);
+    return () => unsub();
+  }, [user, currentUserData, impersonatedUser]);
 
   const handleClockIn = async () => {
-    if (!user) return;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     const targetUid = impersonatedUser?.uid || user.uid;
     const targetName = impersonatedUser?.displayName || user.displayName;
 
@@ -140,6 +138,7 @@ const Timesheets = () => {
       await addDoc(collection(db, "timesheets"), {
         userId: targetUid,
         userName: targetName,
+        businessId: businessId,
         startTime: serverTimestamp(),
         status: "active",
         submissionStatus: "draft",
@@ -197,9 +196,11 @@ const Timesheets = () => {
   };
 
   const handleManualSubmit = async () => {
-    if (!user) return;
+    if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     try {
-      const targetUserId = (userRole === 'admin' && manualEntry.userId) ? manualEntry.userId : user.uid;
+      const isPrivileged = userRole === 'admin' || userRole === 'manager';
+      const targetUserId = (isPrivileged && manualEntry.userId) ? manualEntry.userId : (impersonatedUser?.uid || user.uid);
       const targetUserDoc = await getDoc(doc(db, "users", targetUserId));
       const targetUserData = targetUserDoc.exists() ? targetUserDoc.data() : {};
       const rate = targetUserData.hourlyRate || 0;
@@ -222,6 +223,7 @@ const Timesheets = () => {
         await addDoc(collection(db, "timesheets"), {
           userId: targetUserId,
           userName: targetUserData.displayName || targetUserData.email || "Unknown",
+          businessId: businessId,
           startTime: Timestamp.fromDate(finalStart),
           endTime: Timestamp.fromDate(finalEnd),
           duration: finalDuration,
@@ -233,7 +235,8 @@ const Timesheets = () => {
           rate: rate,
           createdAt: serverTimestamp()
         });
-      } else {
+      }
+ else {
         // Weekly
         const baseDate = parseISO(manualEntry.date);
         for (let i = 0; i < 7; i++) {
@@ -261,6 +264,7 @@ const Timesheets = () => {
           await addDoc(collection(db, "timesheets"), {
             userId: targetUserId,
             userName: targetUserData.displayName || targetUserData.email || "Unknown",
+            businessId: businessId,
             startTime: Timestamp.fromDate(dayStart),
             endTime: Timestamp.fromDate(dayEnd),
             duration: dayDuration,
@@ -329,7 +333,7 @@ const Timesheets = () => {
                 <DialogTitle className="text-2xl font-bold tracking-tighter">Manual Timesheet Entry</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
-                {userRole === 'admin' && (
+                {(userRole === 'admin' || userRole === 'manager') && (
                   <div className="space-y-2">
                     <Label>Team Member</Label>
                     <Select value={manualEntry.userId} onValueChange={(v) => setManualEntry({...manualEntry, userId: v})}>
@@ -565,7 +569,7 @@ const Timesheets = () => {
                     <p className="text-lg font-bold text-white">
                       {entry.duration ? formatDuration(entry.duration) : "Running..."}
                     </p>
-                    {userRole === 'admin' && entry.totalCost && (
+                    {isManagerOrAdmin && entry.totalCost && (
                       <p className="text-xs text-emerald-400 font-bold mt-1">
                         ${entry.totalCost.toFixed(2)}
                       </p>
@@ -602,7 +606,7 @@ const Timesheets = () => {
                 {formatDuration(entries.reduce((sum, e) => sum + (e.duration || 0), 0))}
               </span>
             </div>
-            {userRole === 'admin' && (
+            {isManagerOrAdmin && (
               <div className="pt-4 border-t border-white/5">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Total Labor Cost</span>

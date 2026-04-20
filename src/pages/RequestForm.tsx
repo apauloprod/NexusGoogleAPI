@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { 
   User, 
   Mail, 
@@ -11,7 +12,8 @@ import {
   Wrench, 
   Upload,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,11 +30,43 @@ import {
 } from "@/components/ui/form";
 import { Background } from "../components/Background";
 import { db, handleFirestoreError, OperationType } from "../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
 export default function RequestForm() {
+  const [searchParams] = useSearchParams();
+  const businessId = searchParams.get("biz");
+  
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
+  const [businessName, setBusinessName] = useState("");
+  const [loading, setLoading] = useState(!!businessId);
+
+  useEffect(() => {
+    if (!businessId) return;
+
+    const fetchBusinessData = async () => {
+      try {
+        // Fetch business name
+        const bizDoc = await getDoc(doc(db, "users", businessId));
+        if (bizDoc.exists()) {
+          setBusinessName(bizDoc.data().businessName || "Service Request");
+        }
+
+        // Fetch custom tasks
+        const q = query(collection(db, "customTasks"), where("businessId", "==", businessId));
+        const snap = await getDocs(q);
+        setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error fetching business data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBusinessData();
+  }, [businessId]);
+
   const form = useForm({
     defaultValues: {
       name: "",
@@ -46,11 +80,15 @@ export default function RequestForm() {
   });
 
   const onSubmit = async (data: any) => {
+    if (!businessId) {
+      alert("Invalid request link. businessId is missing.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const path = 'requests';
-      await addDoc(collection(db, path), {
+      await addDoc(collection(db, "requests"), {
         ...data,
+        businessId,
         status: 'pending',
         createdAt: serverTimestamp(),
       });
@@ -70,6 +108,30 @@ export default function RequestForm() {
       form.setValue("services", [...current, service]);
     }
   };
+
+  if (!businessId && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <Background />
+        <div className="max-w-md w-full glass p-12 rounded-[3rem] border-white/10 text-center">
+          <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-2xl font-bold tracking-tighter mb-4">Invalid Link</h2>
+          <p className="text-muted-foreground mb-8">
+            This request form link is invalid or incomplete.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <Background />
+        <div className="animate-spin h-8 w-8 border-2 border-white/20 border-t-white rounded-full" />
+      </div>
+    );
+  }
 
   if (isSubmitted) {
     return (
@@ -108,11 +170,11 @@ export default function RequestForm() {
           className="text-center mb-16"
         >
           <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 text-gradient">
-            Request a Quote
+            {businessName || "Request a Quote"}
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            Tell us about your project and we'll provide a custom data-driven 
-            solution tailored to your business needs.
+            Tell us about your project and we'll provide a custom 
+            solution tailored to your specific needs.
           </p>
         </motion.div>
 
@@ -197,22 +259,26 @@ export default function RequestForm() {
               <div className="space-y-4">
                 <Label className="text-white">Services Required</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {["Data Strategy", "AI Implementation", "Advanced Analytics", "Custom Dashboards"].map((service) => (
-                    <div 
-                      key={service} 
-                      className="flex items-center space-x-3 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/20 transition-colors cursor-pointer"
-                      onClick={() => toggleService(service)}
-                    >
-                      <Checkbox 
-                        id={service} 
-                        checked={form.watch("services").includes(service)}
-                        onCheckedChange={() => toggleService(service)}
-                      />
-                      <label htmlFor={service} className="text-sm font-medium leading-none cursor-pointer">
-                        {service}
-                      </label>
-                    </div>
-                  ))}
+                  {customTasks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2 italic">No predefined services listed.</p>
+                  ) : (
+                    customTasks.map((task) => (
+                      <div 
+                        key={task.id} 
+                        className="flex items-center space-x-3 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/20 transition-colors cursor-pointer"
+                        onClick={() => toggleService(task.name)}
+                      >
+                        <Checkbox 
+                          id={task.id} 
+                          checked={form.watch("services").includes(task.name)}
+                          onCheckedChange={() => toggleService(task.name)}
+                        />
+                        <label htmlFor={task.id} className="text-sm font-medium leading-none cursor-pointer">
+                          {task.name}
+                        </label>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 

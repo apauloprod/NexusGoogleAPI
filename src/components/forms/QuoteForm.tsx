@@ -22,8 +22,9 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, limit, where, onSnapshot } from "firebase/firestore";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useContext } from "react";
 import { format } from "date-fns";
+import { AuthContext } from "../../App";
 
 import { ClientSearchSelect } from "../ClientSearchSelect";
 
@@ -60,16 +61,41 @@ import { SchedulePicker } from "../SchedulePicker";
 
 
 export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
+  const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [customTasks, setCustomTasks] = useState<any[]>([]);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "customTasks"), (snap) => {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+    const unsub = onSnapshot(query(collection(db, "customTasks"), where("businessId", "==", businessId)), (snap) => {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
+
+  useEffect(() => {
+    const fetchBusinessSettings = async () => {
+      if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+      // Fetch the owner/admin of this business for settings
+      const q = query(
+        collection(db, "users"), 
+        where("businessId", "==", businessId), 
+        where("role", "in", ["admin", "manager"]), 
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusinessSettings(snap.docs[0].data());
+      } else {
+        setBusinessSettings(currentUserData);
+      }
+    };
+    fetchBusinessSettings();
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const form = useForm({
     resolver: zodResolver(quoteSchema),
@@ -109,10 +135,16 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
   }, [initialData, form]);
 
   useEffect(() => {
-    if (!initialData?.id && !form.getValues("quoteNumber")) {
+    if (!initialData?.id && !form.getValues("quoteNumber") && (currentUserData?.businessId || impersonatedUser?.businessId)) {
       const fetchLatestQuoteNumber = async () => {
         try {
-          const q = query(collection(db, "quotes"), orderBy("quoteNumber", "desc"), limit(1));
+          const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+          const q = query(
+            collection(db, "quotes"), 
+            where("businessId", "==", businessId),
+            orderBy("quoteNumber", "desc"), 
+            limit(1)
+          );
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
             const latestQuote = snapshot.docs[0].data();
@@ -131,7 +163,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       };
       fetchLatestQuoteNumber();
     }
-  }, [initialData, form]);
+  }, [initialData, form, currentUserData?.businessId]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -157,21 +189,12 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     };
   }, [watchItems]);
 
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchBusinessSettings = async () => {
-      // Find the admin user (apauloprod@gmail.com which is the owner)
-      const q = query(collection(db, "users"), where("role", "==", "admin"), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        setBusinessSettings(snap.docs[0].data());
-      }
-    };
-    fetchBusinessSettings();
-  }, []);
+  // Removed redundant fetch
 
   async function onSubmit(values: QuoteFormValues) {
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
     setIsSubmitting(true);
     try {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
@@ -184,6 +207,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
 
       const quoteData = {
         ...values,
+        businessId,
         clientName,
         items: values.items.map(item => {
           const quantity = Number(item.quantity) || 0;
@@ -255,6 +279,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         await addDoc(collection(db, "visits"), {
           clientId: values.clientId,
           clientName,
+          businessId: currentUserData?.businessId || "",
           title: `Quote ${values.quoteNumber} Visit`,
           scheduledAt: Timestamp.fromDate(scheduledDate),
           duration: values.duration || "1h",
@@ -298,7 +323,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
               </div>
             </div>
           </div>
-          <div className="h-32 w-32 rounded-full bg-orange-400 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+          <div className="h-32 w-32 rounded-full flex items-center justify-center text-white font-bold text-xl overflow-hidden">
             {businessSettings?.businessLogo ? (
               <img src={businessSettings.businessLogo} className="h-full w-full object-contain p-4" referrerPolicy="no-referrer" />
             ) : (
@@ -558,7 +583,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
               className="bg-white text-black hover:bg-white/90 h-12 px-12 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-white/10" 
               disabled={isSubmitting}
             >
-              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Create Quote" : "Create Quote")}
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Quote" : "Create Quote")}
             </Button>
           </div>
         </div>
