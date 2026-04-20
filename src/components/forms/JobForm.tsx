@@ -310,26 +310,26 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
           />
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <FormLabel>Services / Items</FormLabel>
-            <div className="flex gap-2">
-              {isManagerOrAdmin && customTasks.length > 0 && (
-                <Select onValueChange={(val) => {
-                  const task = customTasks.find(t => t.id === val);
-                  if (task) append({ description: task.name, price: task.defaultPrice });
-                }}>
-                  <SelectTrigger className="h-8 w-[150px] bg-white/5 border-white/10 text-[10px] uppercase font-bold">
-                    <SelectValue placeholder="Quick Add" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-black border-white/10">
-                    {customTasks.map(task => (
-                      <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {isManagerOrAdmin && (
+        {isManagerOrAdmin && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <FormLabel>Services / Items</FormLabel>
+              <div className="flex gap-2">
+                {customTasks.length > 0 && (
+                  <Select onValueChange={(val) => {
+                    const task = customTasks.find(t => t.id === val);
+                    if (task) append({ description: task.name, price: task.defaultPrice });
+                  }}>
+                    <SelectTrigger className="h-8 w-[150px] bg-white/5 border-white/10 text-[10px] uppercase font-bold">
+                      <SelectValue placeholder="Quick Add" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10">
+                      {customTasks.map(task => (
+                        <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -339,74 +339,72 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                 >
                   <Plus className="h-3 w-3 mr-1" /> Add Service
                 </Button>
-              )}
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            {fields.map((field, index) => (
-              <div key={field.id} className="flex gap-2 items-start">
-                <div className="flex-1">
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.description`}
-                    render={({ field }) => (
-                      <FormItem>
-                <FormControl>
-                  <Input 
-                    placeholder="Service description" 
-                    {...field} 
-                    className="bg-white/5 border-white/10" 
-                    disabled={!isManagerOrAdmin}
-                  />
-                </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="w-32">
-                  <FormField
-                    control={form.control}
-                    name={`items.${index}.price`}
-                    render={({ field }) => (
-                      <FormItem>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    placeholder="Price" 
-                    {...field} 
-                    className="bg-white/5 border-white/10" 
-                    disabled={!isManagerOrAdmin}
-                  />
-                </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                {fields.length > 1 && (
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-10 w-10 text-muted-foreground hover:text-destructive"
-                    onClick={() => remove(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
-            ))}
-          </div>
+            </div>
+            
+            <div className="space-y-2">
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.description`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              placeholder="Service description" 
+                              {...field} 
+                              className="bg-white/5 border-white/10" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.price`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="Price" 
+                              {...field} 
+                              className="bg-white/5 border-white/10" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {fields.length > 1 && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
 
-          <div className="flex justify-end pt-2 border-t border-white/5">
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Total Amount</p>
-              <p className="text-xl font-bold text-white">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <div className="flex justify-end pt-2 border-t border-white/5">
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total Amount</p>
+                <p className="text-xl font-bold text-white">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <FormField
           control={form.control}

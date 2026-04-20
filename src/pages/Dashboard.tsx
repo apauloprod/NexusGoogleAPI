@@ -396,8 +396,18 @@ export default function Dashboard() {
 
     const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
-    // Fetch team members for this business
-    const teamQuery = query(collection(db, "users"), where("businessId", "==", businessId));
+    // Fetch team members or admins for impersonation
+    let teamQuery;
+    const isSuperAdmin = user?.email === "apauloprod@gmail.com";
+    
+    if (isSuperAdmin) {
+      // Super admin always sees all business owners (admins) to allow switching between them
+      teamQuery = query(collection(db, "users"), where("role", "==", "admin"), limit(100));
+    } else {
+      // Regular view shows team for that business
+      teamQuery = query(collection(db, "users"), where("businessId", "==", businessId));
+    }
+
     const unsubTeam = onSnapshot(teamQuery, (snap) => {
       setTeamMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -555,35 +565,43 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3">
             {user.email === "apauloprod@gmail.com" && (
-              <Select 
-                value={impersonatedUser?.uid || "original"} 
-                onValueChange={(v) => {
-                  if (v === "original") {
-                    setImpersonatedUser(null);
-                  } else {
-                    const member = teamMembers.find(m => m.id === v);
-                    if (member) {
-                      setImpersonatedUser({ 
-                        uid: member.id, 
-                        role: member.role,
-                        businessId: member.businessId || member.id // businessId for admins is usually their id
-                      });
+              <div className="flex items-center gap-2">
+                <Select 
+                  value={impersonatedUser?.uid || "original"} 
+                  onValueChange={(v) => {
+                    if (v === "original") {
+                      setImpersonatedUser(null);
+                    } else {
+                      const member = teamMembers.find(m => m.id === v);
+                      if (member) {
+                        setImpersonatedUser({ 
+                          uid: member.id, 
+                          role: member.role,
+                          businessId: member.businessId || member.id
+                        });
+                      }
                     }
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[180px] bg-white/5 border-white/10 rounded-xl h-10 text-xs">
-                  <SelectValue placeholder="Test as Member" />
-                </SelectTrigger>
-                <SelectContent className="bg-black border-white/10">
-                  <SelectItem value="original">Original View (Admin)</SelectItem>
-                  {teamMembers.filter(m => m.id !== user.uid).map(member => (
-                    <SelectItem key={member.id} value={member.id}>
-                      Test as: {member.displayName || member.email.split('@')[0]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  }}
+                >
+                  <SelectTrigger className="w-[180px] bg-white/5 border-white/10 rounded-xl h-10 text-[10px] uppercase font-black tracking-tighter">
+                    <SelectValue placeholder="Test as Business" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-black border-white/10 max-h-[400px]">
+                    <SelectItem value="original" className="font-bold">Original: Super Admin</SelectItem>
+                    <Separator className="my-2 bg-white/5" />
+                    {teamMembers.filter(m => m.id !== user.uid).map(member => (
+                      <SelectItem key={member.id} value={member.id} className="text-[10px] uppercase">
+                        {member.businessName ? `${member.businessName} (${member.displayName || member.email.split('@')[0]})` : (member.displayName || member.email.split('@')[0])}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {impersonatedUser && (
+                  <Badge variant="outline" className="bg-cyan-500/10 text-cyan-500 border-cyan-500/20 animate-pulse text-[8px] uppercase">
+                    Impersonating
+                  </Badge>
+                )}
+              </div>
             )}
             <Button 
               variant="outline" 

@@ -78,6 +78,7 @@ const Jobs = () => {
   const convertToInvoice = async (job: any) => {
     setIsConverting(job.id);
     try {
+      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
       let invoiceNumber = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
       if (job.quoteNumber) {
         // Extract the numeric part from Q-0001 and use it for INV-0001
@@ -94,11 +95,15 @@ const Jobs = () => {
         invoiceNumber: invoiceNumber,
         clientId: job.clientId,
         clientName: job.clientName,
+        businessId,
         total: job.total || 0,
-        items: job.items || [],
+        items: (job.items || []).map((i: any) => ({
+          description: i.description || "",
+          price: i.price || i.unitPrice || 0
+        })),
         status: "sent",
         paidAmount: 0,
-        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        dueDate: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
         jobId: job.id,
         quoteNumber: job.quoteNumber || "",
         notes: job.notes || "",

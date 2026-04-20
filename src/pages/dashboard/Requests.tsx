@@ -95,7 +95,13 @@ const Requests = () => {
     // 3. Prepare quote data
     const quoteData = {
       clientId,
-      items: (request.services || []).map((s: string) => ({ description: s, price: 0 })),
+      items: (request.items || []).map((item: any) => ({ 
+        description: item.description, 
+        unitPrice: item.price || 0,
+        quantity: 1,
+        unit: "h",
+        vatRate: 20
+      })),
       notes: request.notes || "",
       requestId: request.id,
     };
@@ -200,8 +206,8 @@ const Requests = () => {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right hidden md:block">
-                  <p className="text-sm font-medium text-white">
-                    {req.services?.join(", ") || "No services specified"}
+                  <p className="text-sm font-medium text-white max-w-[200px] truncate">
+                    {req.items?.map((i: any) => i.description).join(", ") || "No services specified"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {req.createdAt?.toDate().toLocaleDateString()}

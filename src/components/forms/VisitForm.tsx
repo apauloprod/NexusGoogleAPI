@@ -1,4 +1,5 @@
-import { useForm } from "react-hook-form";
+import { Plus, Trash2 } from "lucide-react";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc } from "firebase/firestore";
+import { 
+  collection, 
+  addDoc, 
+  serverTimestamp, 
+  getDocs, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc, 
+  getDoc,
+  onSnapshot,
+  where
+} from "firebase/firestore";
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../../App";
 
@@ -29,6 +42,10 @@ const visitSchema = z.object({
   clientId: z.string().min(1, "Please select a client"),
   address: z.string().min(5, "Address must be at least 5 characters"),
   scheduledAt: z.string().min(1, "Please select a date and time"),
+  items: z.array(z.object({
+    description: z.string().min(1, "Description is required"),
+    price: z.coerce.number(),
+  })),
   notes: z.string().optional(),
 });
 
@@ -47,25 +64,36 @@ import { SchedulePicker } from "../SchedulePicker";
 export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) {
   const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
 
   const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
 
   useEffect(() => {
-    // We still need to fetch clients if we want to auto-fill the address
-    // but ClientSearchSelect handles its own fetching.
-    // To auto-fill address, we can listen to clientId changes.
-  }, []);
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const unsub = onSnapshot(query(collection(db, "customTasks"), where("businessId", "==", businessId)), (snap) => {
+      setCustomTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsub();
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const form = useForm<VisitFormValues>({
-    resolver: zodResolver(visitSchema),
-    defaultValues: initialData || {
-      title: "",
-      clientId: "",
-      address: "",
-      scheduledAt: "",
-      notes: "",
+    resolver: zodResolver(visitSchema) as any,
+    defaultValues: {
+      title: initialData?.title || "",
+      clientId: initialData?.clientId || "",
+      address: initialData?.address || "",
+      scheduledAt: initialData?.scheduledAt || "",
+      items: (initialData?.items as any[]) || [{ description: "", price: 0 }],
+      notes: initialData?.notes || "",
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
   });
 
   const selectedClientId = form.watch("clientId");
@@ -123,7 +151,7 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
         <FormField
           control={form.control}
           name="title"
@@ -199,6 +227,95 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
             </FormItem>
           )}
         />
+
+        {isManagerOrAdmin && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <FormLabel>Services Requested</FormLabel>
+              <div className="flex gap-2">
+                {customTasks.length > 0 && (
+                  <Select onValueChange={(val) => {
+                    const task = customTasks.find(t => t.id === val);
+                    if (task) append({ description: task.name, price: task.defaultPrice });
+                  }}>
+                    <SelectTrigger className="h-8 w-[150px] bg-white/5 border-white/10 text-[10px] uppercase font-bold">
+                      <SelectValue placeholder="Quick Add" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10 text-white">
+                      {customTasks.map(task => (
+                        <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 border-white/10 hover:bg-white/5"
+                  onClick={() => append({ description: "", price: 0 })}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Add Service
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.description`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              placeholder="Service description" 
+                              {...field} 
+                              className="bg-white/5 border-white/10" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="w-32">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.price`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="Price" 
+                              {...field} 
+                              className="bg-white/5 border-white/10" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {fields.length > 1 && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <FormField
           control={form.control}

@@ -182,7 +182,7 @@ const Quotes = () => {
     doc.setFont("helvetica", "normal");
     doc.text(quote.clientName, 20, 97);
     
-    const tableData = quote.items.map((item: any) => [
+    const tableData = (quote.items || []).map((item: any) => [
       item.description,
       `$${(item.price || item.unitPrice || 0).toLocaleString()}`
     ]);
@@ -191,7 +191,7 @@ const Quotes = () => {
       startY: 110,
       head: [['Description', 'Price']],
       body: tableData,
-      foot: [['Total', `$${(quote.total || quote.totalHT || 0).toLocaleString()}`]],
+      foot: [['Total', `$${(quote.total || quote.totalTTC || 0).toLocaleString()}`]],
       theme: 'grid',
       headStyles: { fillColor: [0, 0, 0] },
     });
@@ -208,15 +208,20 @@ const Quotes = () => {
 
   const convertToJob = async (quote: any) => {
     try {
+      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
       await addDoc(collection(db, "jobs"), {
         title: `Job from Quote #${quote.quoteNumber}`,
         clientId: quote.clientId,
         clientName: quote.clientName,
+        businessId,
         status: "active",
         notes: quote.notes || "",
         quoteId: quote.id,
         quoteNumber: quote.quoteNumber,
-        items: quote.items || [],
+        items: (quote.items || []).map((i: any) => ({
+          description: i.description || "",
+          price: i.price || i.unitPrice || 0
+        })),
         total: quote.total,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -301,7 +306,7 @@ const Quotes = () => {
               New Quote
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Quote</DialogTitle>
             </DialogHeader>
@@ -341,7 +346,7 @@ const Quotes = () => {
       </div>
 
       <Dialog open={!!editingQuote} onOpenChange={(open) => !open && setEditingQuote(null)}>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Quote</DialogTitle>
           </DialogHeader>

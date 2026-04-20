@@ -250,7 +250,7 @@ const Invoices = () => {
               New Invoice
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Invoice</DialogTitle>
             </DialogHeader>
@@ -290,7 +290,7 @@ const Invoices = () => {
       </div>
 
       <Dialog open={!!editingInvoice} onOpenChange={(open) => !open && setEditingInvoice(null)}>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tighter">Edit Invoice</DialogTitle>
           </DialogHeader>

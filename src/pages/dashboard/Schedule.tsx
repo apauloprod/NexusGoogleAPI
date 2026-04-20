@@ -218,7 +218,7 @@ const Schedule = () => {
                 New Visit
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold tracking-tighter">Schedule New Visit</DialogTitle>
               </DialogHeader>
@@ -234,7 +234,7 @@ const Schedule = () => {
       </div>
 
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
-        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold tracking-tighter">
               Edit {editingItem?.type === 'job' ? 'Job' : 'Visit'}
@@ -311,11 +311,11 @@ const Schedule = () => {
           </div>
         ) : viewMode === 'timeline' ? (
           <div className="overflow-x-auto pb-6 -mx-8 px-8 no-scrollbar">
-            <div className="flex gap-4 min-w-max">
+            <div className="flex gap-2 min-w-max">
               {visibleDays.map(day => {
                 const dayItems = filteredVisits.filter(v => isSameDay(v.scheduledAt.toDate(), day));
                 return (
-                  <div key={day.toISOString()} className="w-72 flex-shrink-0 space-y-4">
+                  <div key={day.toISOString()} className="flex-1 min-w-[120px] max-w-[160px] space-y-4">
                     <div className={cn(
                       "p-4 rounded-3xl text-center border transition-all cursor-default",
                       isSameDay(day, new Date()) 

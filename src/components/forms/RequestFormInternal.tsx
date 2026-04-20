@@ -1,4 +1,3 @@
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -12,9 +11,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Trash2, Search } from "lucide-react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../../App";
 import { ClientSearchSelect } from "../ClientSearchSelect";
@@ -26,7 +33,10 @@ const requestSchema = z.object({
   email: z.string().email("Invalid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   address: z.string().min(5, "Address must be at least 5 characters"),
-  services: z.array(z.string()).min(1, "Please select at least one service"),
+  items: z.array(z.object({
+    description: z.string().min(1, "Description is required"),
+    price: z.coerce.number(),
+  })).min(1, "Please add at least one service"),
   notes: z.string().optional(),
 });
 
@@ -38,34 +48,38 @@ interface RequestFormProps {
   onCancel?: () => void;
 }
 
-const DEFAULT_SERVICES = ["Data Strategy", "AI Implementation", "Advanced Analytics", "Custom Dashboards"];
-
 export function RequestFormInternal({ initialData, onSuccess, onCancel }: RequestFormProps) {
   const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientType, setClientType] = useState<"new" | "existing">(initialData?.clientId ? "existing" : "new");
-  const [availableServices, setAvailableServices] = useState<string[]>(DEFAULT_SERVICES);
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    // Fetch custom tasks to merge with services
-    const unsub = onSnapshot(collection(db, "customTasks"), (snap) => {
-      const custom = snap.docs.map(doc => doc.data().name);
-      setAvailableServices([...DEFAULT_SERVICES, ...custom]);
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    const unsub = onSnapshot(query(collection(db, "customTasks"), where("businessId", "==", businessId)), (snap) => {
+      setCustomTasks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const form = useForm<RequestFormValues>({
-    resolver: zodResolver(requestSchema),
-    defaultValues: initialData || {
-      clientId: "",
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      services: [],
-      notes: "",
+    resolver: zodResolver(requestSchema) as any,
+    defaultValues: {
+      clientId: initialData?.clientId || "",
+      name: initialData?.name || "",
+      email: initialData?.email || "",
+      phone: initialData?.phone || "",
+      address: initialData?.address || "",
+      items: (initialData?.items as any[]) || [{ description: "", price: 0 }],
+      notes: initialData?.notes || "",
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
   });
 
   const selectedClientId = form.watch("clientId");
@@ -133,19 +147,9 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
     }
   }
 
-  const toggleService = (service: string) => {
-    const current = form.getValues("services");
-    if (current.includes(service)) {
-      form.setValue("services", current.filter(s => s !== service));
-    } else {
-      form.setValue("services", [...current, service]);
-    }
-    form.trigger("services");
-  };
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
         <div className="space-y-4">
           <Tabs value={clientType} onValueChange={(v) => setClientType(v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-white/5">
@@ -233,24 +237,73 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
           />
         </div>
 
-        <div className="space-y-2">
-          <FormLabel>Services Requested</FormLabel>
-          <div className="grid grid-cols-2 gap-2">
-            {availableServices.map((service) => (
-              <div 
-                key={service} 
-                className="flex items-center space-x-2 p-2 rounded-lg bg-white/5 border border-white/5 hover:border-white/10 cursor-pointer"
-                onClick={() => toggleService(service)}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <FormLabel>Services Requested</FormLabel>
+            <div className="flex gap-2">
+              {customTasks.length > 0 && (
+                <Select onValueChange={(val) => {
+                  const task = customTasks.find(t => t.id === val);
+                  if (task) append({ description: task.name, price: task.defaultPrice });
+                }}>
+                  <SelectTrigger className="h-8 w-[150px] bg-white/5 border-white/10 text-[10px] uppercase font-bold">
+                    <SelectValue placeholder="Quick Add" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-black border-white/10 text-white">
+                    {customTasks.map(task => (
+                      <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                className="h-8 border-white/10 hover:bg-white/5"
+                onClick={() => append({ description: "", price: 0 })}
               >
-                <Checkbox 
-                  checked={form.watch("services").includes(service)}
-                  onCheckedChange={() => toggleService(service)}
-                />
-                <span className="text-sm">{service}</span>
+                <Plus className="h-3 w-3 mr-1" /> Add Service
+              </Button>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex gap-2 items-start">
+                <div className="flex-1">
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input 
+                            placeholder="Service description" 
+                            {...field} 
+                            className="bg-white/5 border-white/10" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                {fields.length > 1 && (
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
-          <FormMessage>{form.formState.errors.services?.message}</FormMessage>
+          <FormMessage>{form.formState.errors.items?.message}</FormMessage>
         </div>
 
         <FormField
