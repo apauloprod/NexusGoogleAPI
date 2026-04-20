@@ -143,12 +143,19 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
     setIsSubmitting(true);
     try {
       const clientDoc = await getDoc(doc(db, "clients", values.clientId));
-      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
+      const clientName = clientData?.name || "Unknown Client";
+      const clientPhone = clientData?.phone || "";
+      const clientAddress = clientData?.address ? 
+        `${clientData.address.street}, ${clientData.address.city}, ${clientData.address.postcode}` 
+        : "";
       
       const jobData = {
         ...values,
         businessId,
         clientName,
+        clientPhone,
+        clientAddress,
         total,
         scheduledAt: values.scheduledAt ? Timestamp.fromDate(new Date(values.scheduledAt)) : null,
         updatedAt: serverTimestamp(),

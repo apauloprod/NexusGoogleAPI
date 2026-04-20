@@ -27,6 +27,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const AdminControl = () => {
   const { setImpersonatedUser } = useContext(AuthContext);
@@ -81,12 +88,22 @@ const AdminControl = () => {
     navigate("/dashboard");
   };
 
-  const toggleRole = async (userId: string, currentRole: string) => {
+  const updateRole = async (userId: string, newRole: string) => {
     try {
-      await updateDoc(doc(db, "users", userId), {
-        role: currentRole === 'admin' ? 'team' : 'admin',
+      const updates: any = {
+        role: newRole,
         updatedAt: new Date()
-      });
+      };
+
+      if (newRole === 'admin') {
+        // Business Owner: They are their own business
+        updates.businessId = userId;
+      }
+      // If setting to manager or team, we don't automatically know their businessId 
+      // unless they are already on a team. Super Admin might need to assign them to one.
+      // But for now, we'll just allow changing the role.
+
+      await updateDoc(doc(db, "users", userId), updates);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, "users");
     }
@@ -154,12 +171,24 @@ const AdminControl = () => {
                         <CardTitle className="text-xl font-bold tracking-tight text-white">
                           {userItem.displayName || userItem.email}
                         </CardTitle>
-                        <Badge variant="outline" className={cn(
-                          "text-[10px] h-4",
-                          userItem.role === 'admin' ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : "bg-white/5 text-muted-foreground border-white/10"
-                        )}>
-                          {userItem.role === 'admin' ? 'Business Owner' : 'Team Member'}
-                        </Badge>
+                        <Select 
+                          value={userItem.role || "team"} 
+                          onValueChange={(val) => updateRole(userItem.id, val)}
+                        >
+                          <SelectTrigger className={cn(
+                            "h-6 text-[10px] w-[140px] border-white/10",
+                            userItem.role === 'admin' ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" : 
+                            userItem.role === 'manager' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                            "bg-white/5 text-muted-foreground border-white/10"
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-black border-white/10">
+                            <SelectItem value="admin">Business Owner</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="team">Team Member</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-xs text-muted-foreground">
@@ -171,7 +200,10 @@ const AdminControl = () => {
                             {userItem.businessName}
                           </span>
                         )}
-                        <Badge variant="outline" className="bg-white/5 text-[10px] h-4 opacity-50">UID: {userItem.id.slice(0, 8)}</Badge>
+                        <Badge variant="outline" className="bg-white/5 text-[10px] h-4 opacity-70">
+                          {getTeamMembers(userItem.id).length} Team Members
+                        </Badge>
+                        <Badge variant="outline" className="bg-white/5 text-[10px] h-4 opacity-50 uppercase tracking-tighter">BID: {userItem.businessId?.slice(0, 6) || "N/A"}</Badge>
                       </div>
                     </div>
                   </div>
@@ -185,9 +217,6 @@ const AdminControl = () => {
                       <DropdownMenuItem onClick={() => handleImpersonate(userItem)}>
                         <UserPlus className="h-4 w-4 mr-2" />
                         Impersonate User
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toggleRole(userItem.id, userItem.role)}>
-                        {userItem.role === 'admin' ? "Demote to Team Member" : "Promote to Business Owner"}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

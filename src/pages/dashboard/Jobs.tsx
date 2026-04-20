@@ -11,7 +11,9 @@ import {
   MoreVertical,
   FileText,
   Search,
-  Filter
+  Filter,
+  Phone,
+  MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { AuthContext } from "../../App";
 import { useContext } from "react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDoc, where, limit, Timestamp, getDocs } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -39,6 +41,7 @@ const Jobs = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
@@ -56,6 +59,12 @@ const Jobs = () => {
   useEffect(() => {
     if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
     const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+
+    // Fetch team members to resolve names
+    const teamQ = query(collection(db, "users"), where("businessId", "==", businessId));
+    getDocs(teamQ).then(snap => {
+      setTeamMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
 
     const q = query(
       collection(db, "jobs"), 
@@ -307,21 +316,56 @@ const Jobs = () => {
                     </h3>
                     {getStatusBadge(job.status)}
                   </div>
-                  <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1 font-medium">
                       <Clock className="h-3 w-3" /> 
                       {job.scheduledAt ? job.scheduledAt.toDate().toLocaleString() : "Unscheduled"}
                     </span>
-                    {job.location && (
+                    {job.clientPhone && (
+                      <span className="flex items-center gap-1 border-l border-white/10 pl-4">
+                        <Phone className="h-3 w-3 text-cyan-400" />
+                        {job.clientPhone}
+                      </span>
+                    )}
+                    {job.clientAddress && (
                       <a 
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.location)}`}
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.clientAddress)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+                        className="flex items-center gap-1 border-l border-white/10 pl-4 hover:text-cyan-400 transition-colors"
                       >
-                        <ArrowUpRight className="h-3 w-3" />
-                        {job.location}
+                        <MapPin className="h-3 w-3 text-cyan-400" />
+                        {job.clientAddress}
                       </a>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground mt-2">
+                    <div className="flex -space-x-2 mr-2">
+                      {(job.assignedTeam || []).map((memberId: string) => {
+                        const member = teamMembers.find(m => m.id === memberId);
+                        return (
+                          <div 
+                            key={memberId} 
+                            title={member?.displayName || member?.email || memberId}
+                            className="h-6 w-6 rounded-full border-2 border-black bg-white/10 flex items-center justify-center overflow-hidden"
+                          >
+                            {member?.photoURL ? (
+                              <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                            ) : (
+                              <UserIcon className="h-3 w-3" />
+                            )}
+                          </div>
+                        );
+                      })}
+                      {(job.assignedTeam || []).length === 0 && <span className="text-[10px] italic">No team assigned</span>}
+                    </div>
+                    {(job.assignedTeam || []).length > 0 && (
+                      <span className="text-[10px] font-medium text-blue-400">
+                        {(job.assignedTeam || []).map((id: string) => {
+                          const m = teamMembers.find(tm => tm.id === id);
+                          return m?.displayName || m?.email?.split('@')[0] || id;
+                        }).join(", ")}
+                      </span>
                     )}
                   </div>
                   {job.quoteNumber && (

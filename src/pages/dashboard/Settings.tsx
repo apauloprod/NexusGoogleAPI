@@ -18,7 +18,8 @@ import {
   Building2,
   Image as ImageIcon,
   Plus,
-  Clock
+  Clock,
+  UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,11 +48,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 const Settings = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [activeTab, setActiveTab] = useState("profile");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [customTasks, setCustomTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState({ name: "", description: "", defaultPrice: 0 });
@@ -121,9 +128,11 @@ const Settings = () => {
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
 
+  const [activeTab, setActiveTab] = useState(isManagerOrAdmin ? "profile" : "personal");
+
   useEffect(() => {
-    if (!isManagerOrAdmin && activeTab === "profile") {
-      setActiveTab("team"); // Redirect from profile if not admin/manager
+    if (!isManagerOrAdmin && (activeTab === "profile" || activeTab === "team" || activeTab === "tasks" || activeTab === "data")) {
+      setActiveTab("personal");
     }
   }, [isManagerOrAdmin, activeTab]);
 
@@ -354,11 +363,16 @@ const Settings = () => {
         {/* Sidebar Nav */}
         <div className="space-y-1">
           {[
-            { id: "profile", icon: Building2, label: "Business Profile", managerAllowed: true },
-            { id: "team", icon: Users, label: "Team Management", managerAllowed: true },
-            { id: "tasks", icon: Zap, label: "Custom Tasks", managerAllowed: true },
-            { id: "data", icon: Database, label: "Data & Backup", managerAllowed: false },
-          ].filter(item => item.managerAllowed || isAdmin).map((item) => (
+            { id: "personal", icon: UserCircle, label: "Personal Profile", staffAllowed: true },
+            { id: "profile", icon: Building2, label: "Business Profile", staffAllowed: false },
+            { id: "team", icon: Users, label: "Team Management", staffAllowed: false },
+            { id: "tasks", icon: Zap, label: "Custom Tasks", staffAllowed: false },
+            { id: "data", icon: Database, label: "Data & Backup", staffAllowed: false },
+          ].filter(item => {
+            const isStaff = !isAdmin && !isManager;
+            if (isStaff) return item.staffAllowed;
+            return true;
+          }).map((item) => (
             <Button 
               key={item.id} 
               variant="ghost" 
@@ -375,6 +389,52 @@ const Settings = () => {
 
         {/* Content */}
         <div className="md:col-span-3 space-y-12">
+          {activeTab === "personal" && (
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <UserCircle className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">Personal Profile</h2>
+                  <p className="text-sm text-muted-foreground">Manage your personal account details.</p>
+                </div>
+              </div>
+
+              <Card className="bg-black border-white/5 rounded-[2rem] glass">
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Full Name</Label>
+                      <Input 
+                        value={currentUserData?.displayName || ""} 
+                        readOnly 
+                        className="bg-white/5 border-white/10 opacity-70" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email Address</Label>
+                      <Input 
+                        value={currentUserData?.email || ""} 
+                        readOnly 
+                        className="bg-white/5 border-white/10 opacity-70" 
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-white/5">
+                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 block">Assigned Role</Label>
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-white/10 text-white border-transparent px-4 py-1.5 rounded-full capitalize">
+                        {role}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground">This role determines your access permissions within the business.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
           {activeTab === "profile" && (
             <section>
               <div className="flex items-center gap-3 mb-6">
@@ -646,13 +706,50 @@ const Settings = () => {
                                   </DialogHeader>
                                   <div className="space-y-6 pt-4">
                                     <div className="grid grid-cols-2 gap-4">
-                                      <div className="glass p-4 rounded-2xl border-white/5">
-                                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Role</p>
-                                        <p className="font-bold capitalize">{selectedMember?.role}</p>
+                                      <div className="glass p-4 rounded-2xl border-white/5 space-y-2">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold">Role</p>
+                                        <Select 
+                                          value={selectedMember?.role} 
+                                          onValueChange={(val) => {
+                                            if (selectedMember) {
+                                              updateDoc(doc(db, "users", selectedMember.id), {
+                                                role: val,
+                                                updatedAt: new Date()
+                                              });
+                                              setSelectedMember({...selectedMember, role: val});
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger className="bg-white/5 border-white/10 h-10">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent className="bg-black border-white/10">
+                                            <SelectItem value="manager">Manager</SelectItem>
+                                            <SelectItem value="team">Team Member</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <p className="text-[10px] text-muted-foreground italic">Managers have full access to business settings and team management.</p>
                                       </div>
-                                      <div className="glass p-4 rounded-2xl border-white/5">
-                                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Hourly Rate</p>
-                                        <p className="font-bold text-emerald-400">${selectedMember?.hourlyRate}/hr</p>
+                                      <div className="glass p-4 rounded-2xl border-white/5 space-y-2">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold">Hourly Rate</p>
+                                        <div className="flex items-center gap-2">
+                                          <DollarSign className="h-4 w-4 text-emerald-400" />
+                                          <Input 
+                                            type="number"
+                                            value={selectedMember?.hourlyRate || 0}
+                                            onChange={(e) => {
+                                              const rate = parseFloat(e.target.value);
+                                              if (selectedMember) {
+                                                updateDoc(doc(db, "users", selectedMember.id), {
+                                                  hourlyRate: rate,
+                                                  updatedAt: new Date()
+                                                });
+                                                setSelectedMember({...selectedMember, hourlyRate: rate});
+                                              }
+                                            }}
+                                            className="bg-white/5 border-white/10 h-10"
+                                          />
+                                        </div>
                                       </div>
                                     </div>
 

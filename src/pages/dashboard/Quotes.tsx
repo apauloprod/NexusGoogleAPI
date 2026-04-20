@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc, limit } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, getDocs, where, getDoc, limit, Timestamp } from "firebase/firestore";
 
 import { 
   Dialog,
@@ -210,20 +210,31 @@ const Quotes = () => {
   const convertToJob = async (quote: any) => {
     try {
       const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+      
+      const clientDoc = await getDoc(doc(db, "clients", quote.clientId));
+      const clientData = clientDoc.exists() ? clientDoc.data() : null;
+      const clientPhone = clientData?.phone || "";
+      const clientAddress = clientData?.address ? 
+        `${clientData.address.street}, ${clientData.address.city}, ${clientData.address.postcode}` 
+        : "";
+
       await addDoc(collection(db, "jobs"), {
         title: `Job from Quote #${quote.quoteNumber}`,
         clientId: quote.clientId,
         clientName: quote.clientName,
+        clientPhone,
+        clientAddress,
         businessId,
         status: "active",
         notes: quote.notes || "",
         quoteId: quote.id,
         quoteNumber: quote.quoteNumber,
+        scheduledAt: quote.scheduledAt ? Timestamp.fromDate(new Date(quote.scheduledAt)) : null,
         items: (quote.items || []).map((i: any) => ({
           description: i.description || "",
           price: i.price || i.unitPrice || 0
         })),
-        total: quote.total,
+        total: quote.total || quote.totalTTC || 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

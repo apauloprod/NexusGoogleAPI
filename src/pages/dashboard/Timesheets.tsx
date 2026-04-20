@@ -582,7 +582,7 @@ const Timesheets = () => {
                         <Button size="sm" variant="outline" onClick={() => handleSubmit(entry.id, 'weekly')} className="text-xs h-8">Weekly</Button>
                       </div>
                     )}
-                    {userRole === 'admin' && entry.submissionStatus === 'submitted' && (
+                    {isManagerOrAdmin && entry.submissionStatus === 'submitted' && (
                       <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white h-8" onClick={() => handleApprove(entry.id)}>
                         Approve
                       </Button>

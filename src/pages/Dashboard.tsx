@@ -479,11 +479,17 @@ export default function Dashboard() {
         { icon: Users, label: "Clients", to: "/dashboard/clients" },
         { icon: FileText, label: "Requests", to: "/dashboard/requests" },
         { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
+        { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" }, // Moved here for admins to follow flow
         { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
         { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
         { icon: DollarSign, label: "Expenses", to: "/dashboard/expenses" },
         { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
-      ];
+      ].filter((item, index, self) => 
+        // Remove duplicate Jobs if it's already in baseItems (or we move it entirely)
+        index === self.findIndex((t) => (
+          t.to === item.to
+        ))
+      );
     }
 
     return baseItems;
