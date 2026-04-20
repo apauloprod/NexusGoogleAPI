@@ -56,6 +56,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import { AddressAutocomplete } from "../../components/AddressAutocomplete";
+
 const Settings = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -258,6 +260,16 @@ const Settings = () => {
     } catch (error) {
       console.error("Error removing member:", error);
     }
+  };
+
+  const handleAddressChange = (address: string) => {
+    setBusinessData({
+      ...businessData,
+      address: {
+        ...businessData.address,
+        street: address, // For simplicity, we store the full address in street or split it if we want
+      }
+    });
   };
 
   const seedData = async () => {
@@ -502,46 +514,11 @@ const Settings = () => {
 
                 <div className="space-y-4">
                   <Label>Business Address</Label>
-                  <div className="grid grid-cols-1 gap-4">
-                    <Input 
-                      value={businessData.address.street}
-                      onChange={e => setBusinessData({
-                        ...businessData, 
-                        address: { ...businessData.address, street: e.target.value }
-                      })}
-                      placeholder="Street Address" 
-                      className="bg-white/5 border-white/10 rounded-xl h-12" 
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input 
-                        value={businessData.address.city}
-                        onChange={e => setBusinessData({
-                          ...businessData, 
-                          address: { ...businessData.address, city: e.target.value }
-                        })}
-                        placeholder="City" 
-                        className="bg-white/5 border-white/10 rounded-xl h-12" 
-                      />
-                      <Input 
-                        value={businessData.address.postcode}
-                        onChange={e => setBusinessData({
-                          ...businessData, 
-                          address: { ...businessData.address, postcode: e.target.value }
-                        })}
-                        placeholder="Postcode" 
-                        className="bg-white/5 border-white/10 rounded-xl h-12" 
-                      />
-                    </div>
-                    <Input 
-                      value={businessData.address.country}
-                      onChange={e => setBusinessData({
-                        ...businessData, 
-                        address: { ...businessData.address, country: e.target.value }
-                      })}
-                      placeholder="Country" 
-                      className="bg-white/5 border-white/10 rounded-xl h-12" 
-                    />
-                  </div>
+                  <AddressAutocomplete 
+                    value={businessData.address.street}
+                    onChange={handleAddressChange}
+                    placeholder="Enter business address..."
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -554,38 +531,6 @@ const Settings = () => {
                   />
                   <p className="text-xs text-muted-foreground">This information will be displayed alongside your name on invoices and quotes.</p>
                 </div>
-
-                {isManagerOrAdmin && (
-                  <div className="space-y-2">
-                    <Label>Job Visibility (For Team Members)</Label>
-                    <Select 
-                      value={businessData.jobVisibility} 
-                      onValueChange={(v: any) => setBusinessData({...businessData, jobVisibility: v})}
-                    >
-                      <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-12">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-black border-white/10">
-                        <SelectItem value="all">Team members can see ALL jobs</SelectItem>
-                        <SelectItem value="own">Team members can ONLY see their assigned jobs</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-1">Controls what team members see in the Jobs and Schedule pages.</p>
-                  </div>
-                )}
-
-                {isManagerOrAdmin && (
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm font-bold">Team Self-Assignment</Label>
-                      <p className="text-[10px] text-muted-foreground italic">Allow team members to assign themselves to jobs</p>
-                    </div>
-                    <Checkbox 
-                      checked={businessData.allowTeamSelfAssign}
-                      onCheckedChange={(checked) => setBusinessData({...businessData, allowTeamSelfAssign: !!checked})}
-                    />
-                  </div>
-                )}
               </div>
               
               {isManagerOrAdmin && (
@@ -640,6 +585,50 @@ const Settings = () => {
                   >
                     Send Invite
                   </Button>
+                </div>
+
+                <div className="glass p-6 rounded-3xl border-white/5 mb-8 space-y-6">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <SettingsIcon className="h-4 w-4" />
+                    Team Permissions & Visibility
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Job Visibility</Label>
+                      <Select 
+                        value={businessData.jobVisibility} 
+                        onValueChange={(v: any) => setBusinessData({...businessData, jobVisibility: v})}
+                      >
+                        <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-black border-white/10">
+                          <SelectItem value="all">Team members can see ALL jobs</SelectItem>
+                          <SelectItem value="own">Team members can ONLY see their assigned jobs</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">Controls what team members see in the Jobs and Schedule pages.</p>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                      <div className="space-y-0.5">
+                        <Label className="text-sm font-bold">Team Self-Assignment</Label>
+                        <p className="text-[10px] text-muted-foreground italic">Allow team members to assign themselves to jobs</p>
+                      </div>
+                      <Checkbox 
+                        checked={businessData.allowTeamSelfAssign}
+                        onCheckedChange={(checked) => setBusinessData({...businessData, allowTeamSelfAssign: !!checked})}
+                      />
+                    </div>
+
+                    <Button 
+                      onClick={handleSaveBusiness}
+                      className="bg-white text-black hover:bg-white/90 rounded-xl px-8 h-10 font-bold"
+                    >
+                      Save Team Settings
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-4">

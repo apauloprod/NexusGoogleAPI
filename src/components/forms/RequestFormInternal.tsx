@@ -26,13 +26,19 @@ import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../../App";
 import { ClientSearchSelect } from "../ClientSearchSelect";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AddressAutocomplete } from "../AddressAutocomplete";
+import { PhoneInput } from "../ui/PhoneInput";
+import { validatePhoneNumber } from "../../lib/phone";
 
 const requestSchema = z.object({
   clientId: z.string().optional(),
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  phone: z.string().refine(validatePhoneNumber, "Phone number must be 10 digits"),
   address: z.string().min(5, "Address must be at least 5 characters"),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
   items: z.array(z.object({
     description: z.string().min(1, "Description is required"),
     price: z.coerce.number(),
@@ -46,9 +52,10 @@ interface RequestFormProps {
   initialData?: RequestFormValues & { id: string };
   onSuccess?: () => void;
   onCancel?: () => void;
+  onConvertToQuote?: (request: any) => void;
 }
 
-export function RequestFormInternal({ initialData, onSuccess, onCancel }: RequestFormProps) {
+export function RequestFormInternal({ initialData, onSuccess, onCancel, onConvertToQuote }: RequestFormProps) {
   const { currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientType, setClientType] = useState<"new" | "existing">(initialData?.clientId ? "existing" : "new");
@@ -72,6 +79,9 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
       email: initialData?.email || "",
       phone: initialData?.phone || "",
       address: initialData?.address || "",
+      city: initialData?.city || "",
+      state: initialData?.state || "",
+      zip: initialData?.zip || "",
       items: (initialData?.items as any[]) || [{ description: "", price: 0 }],
       notes: initialData?.notes || "",
     },
@@ -94,6 +104,9 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
           form.setValue("email", data.email);
           form.setValue("phone", data.phone);
           form.setValue("address", data.address);
+          form.setValue("city", data.city || "");
+          form.setValue("state", data.state || "");
+          form.setValue("zip", data.zip || "");
         }
       };
       fetchClient();
@@ -115,6 +128,9 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
           email: values.email,
           phone: values.phone,
           address: values.address,
+          city: values.city || "",
+          state: values.state || "",
+          zip: values.zip || "",
           status: "potential", // New clients from requests are potential
           businessId,
           createdAt: serverTimestamp(),
@@ -122,19 +138,20 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
         finalClientId = clientRef.id;
       }
 
+      const requestData = {
+        ...values,
+        clientId: finalClientId,
+        businessId,
+        updatedAt: serverTimestamp(),
+      };
+
       if (initialData?.id) {
         const requestRef = doc(db, "requests", initialData.id);
-        await updateDoc(requestRef, {
-          ...values,
-          clientId: finalClientId,
-          updatedAt: serverTimestamp(),
-        });
+        await updateDoc(requestRef, requestData);
       } else {
         await addDoc(collection(db, "requests"), {
-          ...values,
-          clientId: finalClientId,
+          ...requestData,
           status: "pending",
-          businessId,
           createdAt: serverTimestamp(),
         });
       }
@@ -216,7 +233,7 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
               <FormItem>
                 <FormLabel>Phone</FormLabel>
                 <FormControl>
-                  <Input placeholder="+1 (555) 000-0000" {...field} className="bg-white/5 border-white/10" />
+                  <PhoneInput {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -227,9 +244,60 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
             name="address"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Address</FormLabel>
+                <FormLabel>Street Address</FormLabel>
                 <FormControl>
-                  <Input placeholder="123 Main St, City, State" {...field} className="bg-white/5 border-white/10" />
+                  <AddressAutocomplete 
+                    value={field.value} 
+                    onChange={field.onChange}
+                    onAddressSelect={(data) => {
+                      if (data.street) form.setValue("address", data.street);
+                      if (data.city) form.setValue("city", data.city);
+                      if (data.state) form.setValue("state", data.state);
+                      if (data.zip) form.setValue("zip", data.zip);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            control={form.control}
+            name="city"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>City</FormLabel>
+                <FormControl>
+                  <Input placeholder="City" {...field} className="bg-white/5 border-white/10" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State</FormLabel>
+                <FormControl>
+                  <Input placeholder="State" {...field} className="bg-white/5 border-white/10" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="zip"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Zip Code</FormLabel>
+                <FormControl>
+                  <Input placeholder="Zip" {...field} className="bg-white/5 border-white/10" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -324,13 +392,27 @@ export function RequestFormInternal({ initialData, onSuccess, onCancel }: Reques
           )}
         />
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
-            {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Request" : "Create Request")}
-          </Button>
+        <div className="flex justify-between items-center pt-4">
+          <div>
+            {initialData && onConvertToQuote && (
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="border-white/10 hover:bg-white/5 text-blue-400"
+                onClick={() => onConvertToQuote(initialData)}
+              >
+                Convert to Quote
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-white text-black hover:bg-white/90" disabled={isSubmitting}>
+              {isSubmitting ? (initialData?.id ? "Updating..." : "Creating...") : (initialData?.id ? "Update Request" : "Create Request")}
+            </Button>
+          </div>
         </div>
       </form>
     </Form>

@@ -159,54 +159,59 @@ const Sidebar = ({
                   <Users className="h-6 w-6" />
                   <span className="text-xs">Client</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("visit")}
-                >
-                  <Calendar className="h-6 w-6" />
-                  <span className="text-xs">Visit</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("request")}
-                >
-                  <FileText className="h-6 w-6" />
-                  <span className="text-xs">Request</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("quote")}
-                >
-                  <FileText className="h-6 w-6 text-blue-400" />
-                  <span className="text-xs">Quote</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("job")}
-                >
-                  <CheckSquare className="h-6 w-6 text-emerald-400" />
-                  <span className="text-xs">Job</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("invoice")}
-                >
-                  <FileText className="h-6 w-6 text-amber-400" />
-                  <span className="text-xs">Invoice</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
-                  onClick={() => setActiveForm("payment")}
-                >
-                  <CreditCard className="h-6 w-6 text-purple-400" />
-                  <span className="text-xs">Payment</span>
-                </Button>
+                
+                {displayRole !== 'team' && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                      onClick={() => setActiveForm("visit")}
+                    >
+                      <Calendar className="h-6 w-6" />
+                      <span className="text-xs">Visit</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                      onClick={() => setActiveForm("request")}
+                    >
+                      <FileText className="h-6 w-6" />
+                      <span className="text-xs">Request</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                      onClick={() => setActiveForm("quote")}
+                    >
+                      <FileText className="h-6 w-6 text-blue-400" />
+                      <span className="text-xs">Quote</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                      onClick={() => setActiveForm("job")}
+                    >
+                      <CheckSquare className="h-6 w-6 text-emerald-400" />
+                      <span className="text-xs">Job</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                      onClick={() => setActiveForm("invoice")}
+                    >
+                      <FileText className="h-6 w-6 text-amber-400" />
+                      <span className="text-xs">Invoice</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex flex-col h-24 gap-2 border-white/10 hover:bg-white/5 rounded-2xl"
+                      onClick={() => setActiveForm("payment")}
+                    >
+                      <CreditCard className="h-6 w-6 text-purple-400" />
+                      <span className="text-xs">Payment</span>
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="pt-4">

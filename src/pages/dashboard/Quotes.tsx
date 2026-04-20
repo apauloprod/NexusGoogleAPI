@@ -63,6 +63,10 @@ const Quotes = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const handleDelete = async (id: string) => {
+    if (!isManagerOrAdmin) {
+      alert("You do not have permission to delete quotes.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this quote?")) return;
     try {
       await deleteDoc(doc(db, "quotes", id));
@@ -321,25 +325,27 @@ const Quotes = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Quotes</h1>
           <p className="text-muted-foreground">Create and manage professional quotes for your clients.</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-              <Plus className="h-4 w-4" />
-              New Quote
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Quote</DialogTitle>
-            </DialogHeader>
-            <div className="pt-4">
-              <QuoteForm 
-                onSuccess={() => setIsAddDialogOpen(false)} 
-                onCancel={() => setIsAddDialogOpen(false)} 
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        {impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                <Plus className="h-4 w-4" />
+                New Quote
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Quote</DialogTitle>
+              </DialogHeader>
+              <div className="pt-4">
+                <QuoteForm 
+                  onSuccess={() => setIsAddDialogOpen(false)} 
+                  onCancel={() => setIsAddDialogOpen(false)} 
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-8">
@@ -420,7 +426,7 @@ const Quotes = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {quote.status !== 'approved' && (
+                  {quote.status !== 'approved' && impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -440,22 +446,26 @@ const Quotes = () => {
                   >
                     <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => setEditingQuote(quote)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(quote.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isManagerOrAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-white"
+                      onClick={() => setEditingQuote(quote)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {isManagerOrAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(quote.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 

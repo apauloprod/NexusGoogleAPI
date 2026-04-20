@@ -10,6 +10,7 @@ import {
   MapPin,
   Search,
   MoreVertical,
+  Edit2,
   Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ import {
 } from "@/components/ui/dialog";
 import { ClientForm } from "../../components/forms/ClientForm";
 
+import { formatPhoneNumber } from "../../lib/phone";
+
 const Clients = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -34,11 +37,14 @@ const Clients = () => {
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
+  // We allow team members to see clients, but not modify them
+  /* 
   useEffect(() => {
     if (!isManagerOrAdmin) {
       navigate("/dashboard");
     }
   }, [isManagerOrAdmin, navigate]);
+  */
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,25 +109,27 @@ const Clients = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Clients</h1>
           <p className="text-muted-foreground">Manage your customer database and communication history.</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-              <Plus className="h-4 w-4" />
-              Add Client
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold tracking-tighter">Add New Client</DialogTitle>
-            </DialogHeader>
-            <div className="pt-4">
-              <ClientForm 
-                onSuccess={() => setIsAddDialogOpen(false)} 
-                onCancel={() => setIsAddDialogOpen(false)} 
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+        {isManagerOrAdmin && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                <Plus className="h-4 w-4" />
+                Add Client
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold tracking-tighter">Add New Client</DialogTitle>
+              </DialogHeader>
+              <div className="pt-4">
+                <ClientForm 
+                  onSuccess={() => setIsAddDialogOpen(false)} 
+                  onCancel={() => setIsAddDialogOpen(false)} 
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Dialog open={!!editingClient} onOpenChange={(open) => !open && setEditingClient(null)}>
@@ -194,7 +202,7 @@ const Clients = () => {
                 </div>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   <Phone className="h-4 w-4 shrink-0" />
-                  <span>{client.phone}</span>
+                  <span>{formatPhoneNumber(client.phone)}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4 shrink-0" />
@@ -209,10 +217,22 @@ const Clients = () => {
                   </Badge>
                   {getStatusBadge(client.status)}
                 </div>
-                <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white">
-                  Edit Details
-                  <ArrowUpRight className="h-3 w-3" />
-                </Button>
+                <div className="flex gap-1">
+                  {isManagerOrAdmin && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={() => setEditingClient(client)}>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {isManagerOrAdmin && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setClientToDelete(client)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white" onClick={() => navigate(`/dashboard/jobs?search=${client.name}`)}>
+                    View Jobs
+                    <ArrowUpRight className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))

@@ -53,6 +53,10 @@ const Payments = () => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
 
   const handleDelete = async (id: string) => {
+    if (!isManagerOrAdmin) {
+      alert("You do not have permission to delete payments.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this payment record?")) return;
     try {
       await deleteDoc(doc(db, "payments", id));
@@ -118,25 +122,27 @@ const Payments = () => {
               </p>
             </div>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-                <Plus className="h-4 w-4" />
-                Record Payment
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-bold tracking-tighter">Record Payment</DialogTitle>
-              </DialogHeader>
-              <div className="pt-4">
-                <PaymentForm 
-                  onSuccess={() => setIsAddDialogOpen(false)} 
-                  onCancel={() => setIsAddDialogOpen(false)} 
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
+          {impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                  <Plus className="h-4 w-4" />
+                  Record Payment
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold tracking-tighter">Record Payment</DialogTitle>
+                </DialogHeader>
+                <div className="pt-4">
+                  <PaymentForm 
+                    onSuccess={() => setIsAddDialogOpen(false)} 
+                    onCancel={() => setIsAddDialogOpen(false)} 
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -218,14 +224,16 @@ const Payments = () => {
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
                     <ArrowUpRight className="h-5 w-5" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(payment.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isManagerOrAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(payment.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

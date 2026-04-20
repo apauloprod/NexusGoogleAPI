@@ -38,6 +38,8 @@ import { cn } from "@/lib/utils";
 
 
 
+import { formatPhoneNumber } from "../../lib/phone";
+
 const Jobs = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [searchParams] = useSearchParams();
@@ -51,7 +53,14 @@ const Jobs = () => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
   const handleDelete = async (id: string) => {
+    if (!isManagerOrAdmin) {
+      alert("You do not have permission to delete jobs.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this job?")) return;
     try {
       await deleteDoc(doc(db, "jobs", id));
@@ -225,27 +234,27 @@ const Jobs = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Jobs</h1>
           <p className="text-muted-foreground">Track ongoing work, checklists, and project progress.</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          {(impersonatedUser?.role || currentUserData?.role || 'team') !== 'team' && (
+        {isManagerOrAdmin && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
                 <Plus className="h-4 w-4" />
                 New Job
               </Button>
             </DialogTrigger>
-          )}
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Job</DialogTitle>
-            </DialogHeader>
-            <div className="pt-4">
-              <JobForm 
-                onSuccess={() => setIsAddDialogOpen(false)} 
-                onCancel={() => setIsAddDialogOpen(false)} 
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[700px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Job</DialogTitle>
+              </DialogHeader>
+              <div className="pt-4">
+                <JobForm 
+                  onSuccess={() => setIsAddDialogOpen(false)} 
+                  onCancel={() => setIsAddDialogOpen(false)} 
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-8">
@@ -334,7 +343,7 @@ const Jobs = () => {
                     {job.clientPhone && (
                       <span className="flex items-center gap-1 border-l border-white/10 pl-4">
                         <Phone className="h-3 w-3 text-cyan-400" />
-                        {job.clientPhone}
+                        {formatPhoneNumber(job.clientPhone)}
                       </span>
                     )}
                     {job.clientAddress && (
@@ -393,7 +402,7 @@ const Jobs = () => {
                 </div>
               </div>
                   <div className="flex items-center gap-6">
-                {(impersonatedUser?.role || currentUserData?.role || 'team') !== 'team' && (
+                {isManagerOrAdmin && (
                   <div className="text-right">
                     <p className="text-lg font-bold text-white">
                       ${job.total?.toLocaleString() || "0.00"}
@@ -405,7 +414,7 @@ const Jobs = () => {
                 )}
                 <div className="h-8 w-px bg-white/5 mx-2" />
                 <div className="flex items-center gap-2">
-                  {job.status !== 'completed' && (impersonatedUser?.role || currentUserData?.role || 'team') !== 'team' && (
+                  {job.status !== 'completed' && isManagerOrAdmin && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -425,22 +434,26 @@ const Jobs = () => {
                   >
                     <ImageIcon className="h-5 w-5" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => setEditingJob(job)}
-                  >
-                    <ArrowUpRight className="h-5 w-5" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDelete(job.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isManagerOrAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-white"
+                      onClick={() => setEditingJob(job)}
+                    >
+                      <ArrowUpRight className="h-5 w-5" />
+                    </Button>
+                  )}
+                  {isManagerOrAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(job.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

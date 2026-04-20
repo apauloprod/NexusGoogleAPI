@@ -5,6 +5,7 @@ import {
   User as UserIcon,
   Mail,
   MapPin,
+  Phone,
   Trash2,
   Share2,
   Check
@@ -26,6 +27,8 @@ import {
 import { RequestFormInternal } from "../../components/forms/RequestFormInternal";
 import { QuoteForm } from "../../components/forms/QuoteForm";
 import { updateDoc, doc, getDocs, query as firestoreQuery, addDoc, serverTimestamp } from "firebase/firestore";
+
+import { formatPhoneNumber } from "../../lib/phone";
 
 const Requests = () => {
   const { currentUserData, impersonatedUser } = useContext(AuthContext);
@@ -58,6 +61,10 @@ const Requests = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!isManagerOrAdmin) {
+      alert("You do not have permission to delete requests.");
+      return;
+    }
     if (!confirm("Are you sure you want to delete this request?")) return;
     try {
       await deleteDoc(doc(db, "requests", id));
@@ -85,51 +92,68 @@ const Requests = () => {
     return () => unsubscribe();
   }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
+  const [isConverting, setIsConverting] = useState<string | null>(null);
+
   const handleConvertToQuote = async (request: any) => {
     if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
     const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
-    // 1. Try to find existing client by email
-    const clientsRef = collection(db, "clients");
-    const q = firestoreQuery(
-      clientsRef, 
-      where("email", "==", request.email),
-      where("businessId", "==", businessId)
-    );
-    const snapshot = await getDocs(q);
-    
-    let clientId = "";
-    if (!snapshot.empty) {
-      clientId = snapshot.docs[0].id;
-    } else {
-      // 2. Create new client if not found
-      const newClientRef = await addDoc(collection(db, "clients"), {
-        businessId,
+    setIsConverting(request.id);
+    try {
+      // 1. Try to find existing client by email
+      const clientsRef = collection(db, "clients");
+      const q = firestoreQuery(
+        clientsRef, 
+        where("email", "==", request.email),
+        where("businessId", "==", businessId)
+      );
+      const snapshot = await getDocs(q);
+      
+      let clientId = "";
+      if (!snapshot.empty) {
+        clientId = snapshot.docs[0].id;
+      } else {
+        // 2. Create new client if not found
+        const newClientRef = await addDoc(collection(db, "clients"), {
+          businessId,
+          name: request.name,
+          email: request.email,
+          phone: request.phone,
+          address: request.address,
+          status: "potential", // New clients from requests are potential
+          createdAt: serverTimestamp(),
+        });
+        clientId = newClientRef.id;
+      }
+
+      // 3. Prepare quote data
+      const quoteData = {
+        clientId,
         name: request.name,
         email: request.email,
         phone: request.phone,
         address: request.address,
-        status: "potential", // New clients from requests are potential
-        createdAt: serverTimestamp(),
-      });
-      clientId = newClientRef.id;
+        city: request.city || "",
+        state: request.state || "",
+        zip: request.zip || "",
+        items: (request.items || []).map((item: any) => ({ 
+          description: item.description, 
+          price: item.price || 0,
+        })),
+        notes: request.notes || "",
+        requestId: request.id,
+      };
+
+      // Add a small delay to allow the edit dialog to close if it was open
+      setTimeout(() => {
+        setConvertingRequest(quoteData);
+      }, 100);
+    } catch (error) {
+      console.error("Conversion error:", error);
+      handleFirestoreError(error, OperationType.CREATE, "quotes");
+    } finally {
+      setIsConverting(null);
     }
-
-    // 3. Prepare quote data
-    const quoteData = {
-      clientId,
-      items: (request.items || []).map((item: any) => ({ 
-        description: item.description, 
-        unitPrice: item.price || 0,
-        quantity: 1,
-        unit: "h",
-        vatRate: 20
-      })),
-      notes: request.notes || "",
-      requestId: request.id,
-    };
-
-    setConvertingRequest(quoteData);
   };
 
   const onQuoteCreated = async () => {
@@ -156,27 +180,29 @@ const Requests = () => {
             {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Share2 className="h-4 w-4" />}
             {copied ? "Copied Link" : "Copy Form Link"}
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-              <Plus className="h-4 w-4" />
-              Add Request
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Request</DialogTitle>
-            </DialogHeader>
-            <div className="pt-4">
-              <RequestFormInternal 
-                onSuccess={() => setIsAddDialogOpen(false)} 
-                onCancel={() => setIsAddDialogOpen(false)} 
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
+          {isManagerOrAdmin && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                  <Plus className="h-4 w-4" />
+                  Add Request
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold tracking-tighter">Create New Request</DialogTitle>
+                </DialogHeader>
+                <div className="pt-4">
+                  <RequestFormInternal 
+                    onSuccess={() => setIsAddDialogOpen(false)} 
+                    onCancel={() => setIsAddDialogOpen(false)} 
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
-    </div>
 
       <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem]">
@@ -189,6 +215,10 @@ const Requests = () => {
                 initialData={editingRequest}
                 onSuccess={() => setEditingRequest(null)} 
                 onCancel={() => setEditingRequest(null)} 
+                onConvertToQuote={(req) => {
+                  setEditingRequest(null);
+                  handleConvertToQuote(req);
+                }}
               />
             )}
           </div>
@@ -231,8 +261,9 @@ const Requests = () => {
                       {req.status}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {req.email}</span>
+                    {req.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {formatPhoneNumber(req.phone)}</span>}
                     <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {req.address}</span>
                   </div>
                 </div>
@@ -246,29 +277,32 @@ const Requests = () => {
                     {req.createdAt?.toDate().toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {req.status === 'pending' && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-white/10 hover:bg-white/5 text-xs h-8"
-                      onClick={() => handleConvertToQuote(req)}
-                    >
-                      Convert to Quote
+                  <div className="flex items-center gap-2">
+                    {req.status === 'pending' && impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-white/10 hover:bg-white/5 text-xs h-8"
+                        onClick={() => handleConvertToQuote(req)}
+                        disabled={isConverting === req.id}
+                      >
+                        {isConverting === req.id ? "Converting..." : "Convert to Quote"}
+                      </Button>
+                    )}
+                    {isManagerOrAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive" 
+                        onClick={() => handleDelete(req.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" onClick={() => setEditingRequest(req)}>
+                      <ArrowUpRight className="h-5 w-5" />
                     </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-destructive" 
-                    onClick={() => handleDelete(req.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" onClick={() => setEditingRequest(req)}>
-                    <ArrowUpRight className="h-5 w-5" />
-                  </Button>
-                </div>
+                  </div>
               </div>
             </div>
           ))

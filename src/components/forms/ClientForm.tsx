@@ -17,12 +17,20 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/fi
 import { useState, useContext } from "react";
 import { AuthContext } from "../../App";
 
+import { ClientSearchSelect } from "../ClientSearchSelect";
+import { AddressAutocomplete } from "../AddressAutocomplete";
+import { PhoneInput } from "../ui/PhoneInput";
+import { validatePhoneNumber } from "../../lib/phone";
+
 const clientSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   company: z.string().optional(),
   email: z.string().email("Invalid email address"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  phone: z.string().refine(validatePhoneNumber, "Phone number must be 10 digits"),
   address: z.string().min(5, "Address must be at least 5 characters"),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
   status: z.enum(["potential", "active", "returning"]),
   notes: z.string().optional(),
 });
@@ -55,6 +63,9 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
       email: "",
       phone: "",
       address: "",
+      city: "",
+      state: "",
+      zip: "",
       status: "potential",
       notes: "",
     },
@@ -142,7 +153,7 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
               <FormItem>
                 <FormLabel>Phone</FormLabel>
                 <FormControl>
-                  <Input placeholder="+1 (555) 000-0000" {...field} className="bg-white/5 border-white/10" />
+                  <PhoneInput {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -156,9 +167,18 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
             name="address"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Address</FormLabel>
+                <FormLabel>Street Address</FormLabel>
                 <FormControl>
-                  <Input placeholder="123 Main St, City, State" {...field} className="bg-white/5 border-white/10" />
+                  <AddressAutocomplete 
+                    value={field.value} 
+                    onChange={field.onChange}
+                    onAddressSelect={(data) => {
+                      if (data.street) form.setValue("address", data.street);
+                      if (data.city) form.setValue("city", data.city);
+                      if (data.state) form.setValue("state", data.state);
+                      if (data.zip) form.setValue("zip", data.zip);
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -182,6 +202,48 @@ export function ClientForm({ initialData, onSuccess, onCancel }: ClientFormProps
                     <SelectItem value="returning">Returning</SelectItem>
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <FormField
+            control={form.control}
+            name="city"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>City</FormLabel>
+                <FormControl>
+                  <Input placeholder="City" {...field} className="bg-white/5 border-white/10" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="state"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>State</FormLabel>
+                <FormControl>
+                  <Input placeholder="State" {...field} className="bg-white/5 border-white/10" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="zip"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Zip Code</FormLabel>
+                <FormControl>
+                  <Input placeholder="Zip" {...field} className="bg-white/5 border-white/10" />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}

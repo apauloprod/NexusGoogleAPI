@@ -10,6 +10,8 @@ import PublicQuoteApproval from "./pages/PublicQuoteApproval";
 import PublicPayment from "./pages/PublicPayment";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
 export const AuthContext = createContext<{ 
   user: User | null; 
   loading: boolean;
@@ -31,7 +33,25 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentUserData, setCurrentUserData] = useState<any | null>(null);
   const [impersonatedUser, setImpersonatedUser] = useState<{ uid: string; role: string; businessId: string; displayName?: string } | null>(null);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
 
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY) return;
+
+    const existingScript = document.getElementById("google-maps-script");
+    if (existingScript) {
+      setScriptLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setScriptLoaded(true);
+    document.head.appendChild(script);
+  }, []);
   useEffect(() => {
     document.documentElement.classList.add("dark");
     let unsubUserDoc: (() => void) | null = null;

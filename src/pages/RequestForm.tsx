@@ -31,6 +31,27 @@ import {
 import { Background } from "../components/Background";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { AddressAutocomplete } from "../components/AddressAutocomplete";
+import { PhoneInput } from "../components/ui/PhoneInput";
+import { validatePhoneNumber } from "../lib/phone";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+
+const requestSchema = z.object({
+  name: z.string().min(2, "Full name is required"),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().refine(validatePhoneNumber, "Phone number must be at least 10 digits"),
+  address: z.string().min(5, "Address must be at least 5 characters"),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  services: z.array(z.string()),
+  availability: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type RequestFormValues = z.infer<typeof requestSchema>;
 
 export default function RequestForm() {
   const [searchParams] = useSearchParams();
@@ -67,19 +88,23 @@ export default function RequestForm() {
     fetchBusinessData();
   }, [businessId]);
 
-  const form = useForm({
+  const form = useForm<RequestFormValues>({
+    resolver: zodResolver(requestSchema),
     defaultValues: {
       name: "",
       email: "",
       phone: "",
       address: "",
-      services: [] as string[],
+      city: "",
+      state: "",
+      zip: "",
+      services: [],
       availability: "",
       notes: "",
     }
   });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: RequestFormValues) => {
     if (!businessId) {
       alert("Invalid request link. businessId is missing.");
       return;
@@ -230,8 +255,11 @@ export default function RequestForm() {
                       <FormLabel className="text-white">Phone Number</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input placeholder="+1 (555) 000-0000" className="pl-10 bg-white/5 border-white/10 rounded-xl h-12" {...field} />
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                          <PhoneInput 
+                            {...field} 
+                            className="pl-10 h-12 rounded-xl"
+                          />
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -243,12 +271,65 @@ export default function RequestForm() {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white">Business Address</FormLabel>
+                      <FormLabel className="text-white">Street Address</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input placeholder="123 Business St, City" className="pl-10 bg-white/5 border-white/10 rounded-xl h-12" {...field} />
+                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                          <AddressAutocomplete 
+                            value={field.value} 
+                            onChange={field.onChange}
+                            onAddressSelect={(data) => {
+                              if (data.street) form.setValue("address", data.street);
+                              if (data.city) form.setValue("city", data.city);
+                              if (data.state) form.setValue("state", data.state);
+                              if (data.zip) form.setValue("zip", data.zip);
+                            }}
+                            placeholder="123 Business St"
+                            className="pl-10 h-12 rounded-xl"
+                          />
                         </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="City" className="bg-white/5 border-white/10 rounded-xl h-12" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">State</FormLabel>
+                      <FormControl>
+                        <Input placeholder="State" className="bg-white/5 border-white/10 rounded-xl h-12" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zip"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white">Zip Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Zip" className="bg-white/5 border-white/10 rounded-xl h-12" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

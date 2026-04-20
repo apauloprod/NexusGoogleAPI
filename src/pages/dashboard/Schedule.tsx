@@ -211,25 +211,27 @@ const Schedule = () => {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
-                <Plus className="h-4 w-4" />
-                New Visit
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-bold tracking-tighter">Schedule New Visit</DialogTitle>
-              </DialogHeader>
-              <div className="pt-4">
-                <VisitForm 
-                  onSuccess={() => setIsAddDialogOpen(false)} 
-                  onCancel={() => setIsAddDialogOpen(false)} 
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
+          {impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
+                  <Plus className="h-4 w-4" />
+                  New Visit
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-black border-white/10 text-white sm:max-w-[600px] rounded-[2rem] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold tracking-tighter">Schedule New Visit</DialogTitle>
+                </DialogHeader>
+                <div className="pt-4">
+                  <VisitForm 
+                    onSuccess={() => setIsAddDialogOpen(false)} 
+                    onCancel={() => setIsAddDialogOpen(false)} 
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 

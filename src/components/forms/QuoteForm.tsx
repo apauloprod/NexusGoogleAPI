@@ -29,8 +29,20 @@ import { AuthContext } from "../../App";
 import { ClientSearchSelect } from "../ClientSearchSelect";
 import { cn } from "@/lib/utils";
 
+import { AddressAutocomplete } from "../AddressAutocomplete";
+import { PhoneInput } from "../ui/PhoneInput";
+import { validatePhoneNumber } from "../../lib/phone";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 const quoteSchema = z.object({
-  clientId: z.string().min(1, "Please select a client"),
+  clientId: z.string().optional(),
+  name: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
   quoteNumber: z.string().min(1, "Quote number is required"),
   items: z.array(z.object({
     description: z.string().min(1, "Description is required"),
@@ -41,6 +53,12 @@ const quoteSchema = z.object({
   duration: z.string().optional(),
   depositAmount: z.coerce.number().min(0).optional(),
   paymentRequired: z.boolean().default(true),
+}).refine((data) => {
+  if (data.clientId) return true;
+  return !!(data.name && data.email && data.phone && validatePhoneNumber(data.phone) && data.address);
+}, {
+  message: "Please select a client or enter complete new client details (including valid phone)",
+  path: ["clientId"],
 });
 
 type QuoteFormValues = z.infer<typeof quoteSchema>;
@@ -53,14 +71,71 @@ interface QuoteFormProps {
 
 import { SchedulePicker } from "../SchedulePicker";
 
-
-
 export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [customTasks, setCustomTasks] = useState<any[]>([]);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
+  const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
+
+  const form = useForm<QuoteFormValues>({
+    resolver: zodResolver(quoteSchema) as any,
+    defaultValues: {
+      clientId: initialData?.clientId || "",
+      name: initialData?.name || "",
+      email: initialData?.email || "",
+      phone: initialData?.phone || "",
+      address: initialData?.address || "",
+      city: initialData?.city || "",
+      state: initialData?.state || "",
+      zip: initialData?.zip || "",
+      quoteNumber: initialData?.quoteNumber || "",
+      items: initialData?.items ? initialData.items.map((i: any) => ({
+        description: i.description || "",
+        price: i.price || i.unitPrice || 0
+      })) : [{ description: "", price: 0 }],
+      notes: initialData?.notes || "",
+      scheduledAt: initialData?.scheduledAt 
+        ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
+        : "",
+      duration: initialData?.duration || "1h",
+      depositAmount: initialData?.depositAmount || 0,
+      paymentRequired: initialData?.paymentRequired !== undefined ? initialData.paymentRequired : true,
+    },
+  });
+
+  useEffect(() => {
+    if (initialData?.clientId) setClientMode("existing");
+    else if (initialData?.email || initialData?.name) setClientMode("new");
+  }, [initialData]);
+
+  useEffect(() => {
+    if (initialData) {
+      const currentValues = form.getValues();
+      form.reset({
+        ...currentValues,
+        clientId: initialData.clientId || "",
+        name: initialData.name || "",
+        email: initialData.email || "",
+        phone: initialData.phone || "",
+        address: initialData.address || "",
+        city: initialData.city || "",
+        state: initialData.state || "",
+        zip: initialData.zip || "",
+        items: initialData.items ? initialData.items.map((i: any) => ({
+          description: i.description || "",
+          price: i.price || i.unitPrice || 0
+        })) : [{ description: "", price: 0 }],
+        notes: initialData.notes || "",
+        scheduledAt: initialData.scheduledAt 
+          ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
+          : "",
+        duration: initialData.duration || "1h",
+        quoteNumber: currentValues.quoteNumber || initialData.quoteNumber || "",
+      });
+    }
+  }, [initialData]);
 
   useEffect(() => {
     if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
@@ -82,43 +157,6 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     };
     fetchBusinessSettings();
   }, [currentUserData?.businessId, impersonatedUser?.businessId]);
-
-  const form = useForm<QuoteFormValues>({
-    resolver: zodResolver(quoteSchema) as any,
-    defaultValues: {
-      clientId: initialData?.clientId || "",
-      quoteNumber: initialData?.quoteNumber || "",
-      items: initialData?.items ? initialData.items.map((i: any) => ({
-        description: i.description || "",
-        price: i.price || i.unitPrice || 0
-      })) : [{ description: "", price: 0 }],
-      notes: initialData?.notes || "",
-      scheduledAt: initialData?.scheduledAt 
-        ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
-        : "",
-      duration: initialData?.duration || "1h",
-      depositAmount: initialData?.depositAmount || 0,
-      paymentRequired: initialData?.paymentRequired !== undefined ? initialData.paymentRequired : true,
-    },
-  });
-
-  useEffect(() => {
-    if (initialData) {
-      form.reset({
-        clientId: initialData.clientId || "",
-        quoteNumber: initialData.quoteNumber || "",
-        items: initialData.items ? initialData.items.map((i: any) => ({
-          description: i.description || "",
-          price: i.price || i.unitPrice || 0
-        })) : [{ description: "", price: 0 }],
-        notes: initialData.notes || "",
-        scheduledAt: initialData.scheduledAt 
-          ? (typeof initialData.scheduledAt === 'string' ? initialData.scheduledAt : initialData.scheduledAt.toDate().toISOString())
-          : "",
-        duration: initialData.duration || "1h",
-      });
-    }
-  }, [initialData]);
 
   useEffect(() => {
     if (!initialData?.id && !form.getValues("quoteNumber") && (currentUserData?.businessId || impersonatedUser?.businessId)) {
@@ -144,12 +182,14 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           }
         } catch (error) {
           console.error("Error fetching latest quote number:", error);
-          form.setValue("quoteNumber", "Q-0001");
+          if (!form.getValues("quoteNumber")) {
+            form.setValue("quoteNumber", "Q-0001");
+          }
         }
       };
       fetchLatestQuoteNumber();
     }
-  }, [initialData, currentUserData?.businessId]);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -167,13 +207,38 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
 
     setIsSubmitting(true);
     try {
-      const clientDoc = await getDoc(doc(db, "clients", values.clientId));
-      const clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
-      const clientEmail = clientDoc.exists() ? clientDoc.data().email : null;
+      let clientId = values.clientId;
+      let clientName = "";
+      let clientEmail = values.email;
+
+      if (clientMode === "new") {
+        const clientRef = await addDoc(collection(db, "clients"), {
+          name: values.name,
+          email: values.email,
+          phone: values.phone,
+          address: values.address,
+          city: values.city || "",
+          state: values.state || "",
+          zip: values.zip || "",
+          businessId,
+          status: "active",
+          createdAt: serverTimestamp(),
+        });
+        clientId = clientRef.id;
+        clientName = values.name!;
+      } else {
+        const clientDoc = await getDoc(doc(db, "clients", values.clientId!));
+        clientName = clientDoc.exists() ? clientDoc.data().name : "Unknown Client";
+        clientEmail = clientDoc.exists() ? clientDoc.data().email : null;
+      }
+
       let quoteId = initialData?.id;
       
+      const { items, ...restValues } = values;
       const quoteData = {
-        ...values,
+        ...restValues,
+        items: items.map(i => ({ description: i.description, price: Number(i.price) })),
+        clientId,
         businessId,
         clientName,
         total,
@@ -215,7 +280,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       if (values.scheduledAt) {
         const scheduledDate = new Date(values.scheduledAt);
         await addDoc(collection(db, "visits"), {
-          clientId: values.clientId,
+          clientId,
           clientName,
           businessId,
           title: `Quote ${values.quoteNumber} Visit`,
@@ -230,6 +295,7 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       form.reset();
       onSuccess?.();
     } catch (error) {
+      console.error("Quote creation error:", error);
       handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "quotes");
     } finally {
       setIsSubmitting(false);
@@ -239,35 +305,171 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="clientId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Client</FormLabel>
-                <FormControl>
-                  <ClientSearchSelect 
-                    onValueChange={field.onChange}
-                    value={field.value}
+        <div className="space-y-4">
+          <Tabs value={clientMode} onValueChange={(v) => setClientMode(v as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-white/5">
+              <TabsTrigger value="existing">Existing Client</TabsTrigger>
+              <TabsTrigger value="new">New Client</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {clientMode === "existing" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="clientId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
+                    <FormControl>
+                      <ClientSearchSelect 
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="quoteNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quote Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly className="bg-white/5 border-white/10" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Client Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} className="bg-white/5 border-white/10" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="quoteNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quote Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} readOnly className="bg-white/5 border-white/10" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="john@example.com" {...field} className="bg-white/5 border-white/10" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <PhoneInput {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-3">
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Street Address</FormLabel>
+                        <FormControl>
+                          <AddressAutocomplete 
+                            value={field.value || ""} 
+                            onChange={field.onChange} 
+                            onAddressSelect={(data) => {
+                              if (data.street) form.setValue("address", data.street);
+                              if (data.city) form.setValue("city", data.city);
+                              if (data.state) form.setValue("state", data.state);
+                              if (data.zip) form.setValue("zip", data.zip);
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="quoteNumber"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Quote Number</FormLabel>
-                <FormControl>
-                  <Input {...field} readOnly className="bg-white/5 border-white/10" />
-                </FormControl>
-              </FormItem>
-            )}
-          />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="City" {...field} className="bg-white/5 border-white/10" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input placeholder="State" {...field} className="bg-white/5 border-white/10" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zip"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zip Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Zip" {...field} className="bg-white/5 border-white/10" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
