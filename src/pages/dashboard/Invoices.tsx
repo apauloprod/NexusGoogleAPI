@@ -367,7 +367,7 @@ const Invoices = () => {
                       <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
                         Job: 
                         <Link to={`/dashboard/jobs?search=${inv.jobId}`} className="text-amber-400 hover:underline">
-                          {inv.jobId.slice(0, 8)}...
+                          {inv.jobTitle || inv.jobId.slice(0, 8)}
                         </Link>
                       </div>
                     )}

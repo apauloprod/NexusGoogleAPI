@@ -76,6 +76,44 @@ export default function PublicPayment() {
               status: "approved",
               updatedAt: serverTimestamp(),
             });
+
+            // Handle address formatting
+            let clientAddress = "";
+            if (data?.address) {
+              if (typeof data.address === 'string') {
+                clientAddress = data.address;
+              } else {
+                const { street = "", city = "", state = "", zip = "" } = data.address;
+                clientAddress = [street, city, state, zip].filter(Boolean).join(", ");
+              }
+            } else if (data.clientAddress) {
+              clientAddress = data.clientAddress;
+            }
+
+            // Create Job automatically after successful payment
+            await addDoc(collection(db, "jobs"), {
+              title: `Job from Quote #${data.quoteNumber}`,
+              clientId: data.clientId,
+              clientName: data.clientName,
+              clientPhone: data.clientPhone || "",
+              clientAddress: clientAddress,
+              businessId: data.businessId,
+              status: "active",
+              notes: data.notes || "",
+              quoteId: id,
+              quoteNumber: data.quoteNumber,
+              items: data.items || [],
+              total: data.total,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+
+            // Update client status
+            const clientRef = doc(db, "clients", data.clientId);
+            await updateDoc(clientRef, {
+              status: "active",
+              updatedAt: serverTimestamp(),
+            });
           }
         } catch (error) {
           console.error("Error recording payment:", error);

@@ -41,6 +41,12 @@ const Schedule = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'timeline'>('calendar');
+
+  useEffect(() => {
+    if (currentUserData?.preferredScheduleView) {
+      setViewMode(currentUserData.preferredScheduleView as any);
+    }
+  }, [currentUserData?.preferredScheduleView]);
   const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
 
   const handleDelete = async () => {

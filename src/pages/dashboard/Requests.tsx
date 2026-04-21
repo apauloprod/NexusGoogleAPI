@@ -264,7 +264,16 @@ const Requests = () => {
                   <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {req.email}</span>
                     {req.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {formatPhoneNumber(req.phone)}</span>}
-                    <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {req.address}</span>
+                    <a 
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([req.address, req.city, req.state, req.zip].filter(Boolean).join(", "))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MapPin className="h-3 w-3 text-cyan-400" /> 
+                      {[req.address, req.city, req.state, req.zip].filter(Boolean).join(", ")}
+                    </a>
                   </div>
                 </div>
               </div>

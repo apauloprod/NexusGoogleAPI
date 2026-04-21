@@ -47,7 +47,7 @@ export default function PublicQuoteApproval() {
 
     if (quote.paymentRequired) {
       const amountToPay = quote.depositAmount > 0 ? quote.depositAmount : quote.total;
-      navigate(`/pay?quoteId=${quoteId}&amount=${amountToPay}`);
+      navigate(`/pay?type=quote&id=${quoteId}&amount=${amountToPay}`);
       return;
     }
 
@@ -60,11 +60,27 @@ export default function PublicQuoteApproval() {
         updatedAt: serverTimestamp(),
       });
 
+      // Handle address formatting
+      let clientAddress = "";
+      if (quote?.address) {
+        if (typeof quote.address === 'string') {
+          clientAddress = quote.address;
+        } else {
+          const { street = "", city = "", state = "", zip = "" } = quote.address;
+          clientAddress = [street, city, state, zip].filter(Boolean).join(", ");
+        }
+      } else if (quote.clientAddress) {
+        clientAddress = quote.clientAddress;
+      }
+
       // 2. Create Job automatically
       await addDoc(collection(db, "jobs"), {
         title: `Job from Quote #${quote.quoteNumber}`,
         clientId: quote.clientId,
         clientName: quote.clientName,
+        clientPhone: quote.clientPhone || "",
+        clientAddress: clientAddress,
+        businessId: quote.businessId,
         status: "active",
         notes: quote.notes || "",
         quoteId: quoteId,

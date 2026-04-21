@@ -140,6 +140,7 @@ const Jobs = () => {
         paidAmount: 0,
         dueDate: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
         jobId: job.id,
+        jobTitle: job.title,
         quoteNumber: job.quoteNumber || "",
         notes: job.notes || "",
         createdAt: serverTimestamp(),

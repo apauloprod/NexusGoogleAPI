@@ -156,7 +156,7 @@ async function startServer() {
             <p style="color: #555; line-height: 1.6;">To proceed with this work, please click the button below to approve the quote online:</p>
             <div style="margin: 20px 0;">
               <a href="${approvalUrl}" style="display: inline-block; background: #000; color: #fff; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px;">Approve Quote Online</a>
-              <a href="${paymentUrl}" style="display: inline-block; background: #fff; color: #000; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #000;">Pay Deposit</a>
+              ${quote.paymentRequired ? `<a href="${paymentUrl}" style="display: inline-block; background: #fff; color: #000; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #000;">Pay Deposit</a>` : ""}
             </div>
             <p style="color: #888; font-size: 12px; margin-top: 30px;">If you have any questions, please reply to this email.</p>
           </div>

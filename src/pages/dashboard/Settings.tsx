@@ -423,7 +423,6 @@ const Settings = () => {
           {[
             { id: "personal", icon: UserCircle, label: "Personal Profile", staffAllowed: true },
             { id: "profile", icon: Building2, label: "Business Profile", staffAllowed: false },
-            { id: "team", icon: Users, label: "Team Management", staffAllowed: false },
             { id: "tasks", icon: Zap, label: "Custom Tasks", staffAllowed: false },
             { id: "data", icon: Database, label: "Data & Backup", staffAllowed: false },
           ].filter(item => {
@@ -477,6 +476,28 @@ const Settings = () => {
                         readOnly 
                         className="bg-white/5 border-white/10 opacity-70" 
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Preferred Schedule View</Label>
+                      <Select 
+                        value={currentUserData?.preferredScheduleView || "timeline"}
+                        onValueChange={async (value) => {
+                          if (!user) return;
+                          await updateDoc(doc(db, "users", user.uid), {
+                            preferredScheduleView: value
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-11">
+                          <SelectValue placeholder="Select view" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-black border-white/10 text-white">
+                          <SelectItem value="timeline">Timeline</SelectItem>
+                          <SelectItem value="calendar">Calendar</SelectItem>
+                          <SelectItem value="list">List</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground mt-1">This will be your default view when you load the schedule page.</p>
                     </div>
                   </div>
                   <div className="pt-4 border-t border-white/5">

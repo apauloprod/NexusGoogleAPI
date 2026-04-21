@@ -73,6 +73,7 @@ import Marketing from "./dashboard/Marketing";
 import Overview from "./dashboard/Overview";
 import Expenses from "./dashboard/Expenses";
 import AdminControl from "./dashboard/AdminControl";
+import Team from "./dashboard/Team";
 
 interface SidebarItemProps {
   icon: any;
@@ -490,6 +491,7 @@ export default function Dashboard() {
       return [
         ...baseItems,
         { icon: Users, label: "Clients", to: "/dashboard/clients" },
+        { icon: Users, label: "Team", to: "/dashboard/team" },
         { icon: FileText, label: "Requests", to: "/dashboard/requests" },
         { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
         { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" }, // Moved here for admins to follow flow
@@ -690,6 +692,7 @@ export default function Dashboard() {
             <Route path="/timesheets" element={<Timesheets />} />
             <Route path="/marketing" element={<Marketing />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/team" element={<Team />} />
             <Route path="/admin" element={<AdminControl />} />
           </Routes>
         </main>
