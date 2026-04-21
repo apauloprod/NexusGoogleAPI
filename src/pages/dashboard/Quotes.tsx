@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { 
   Plus, 
   FileText,
@@ -47,13 +47,26 @@ const Quotes = () => {
   const [searchParams] = useSearchParams();
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isManagerOrAdmin = isAdmin || isManager;
+  
+  const permissions = currentUserData?.permissions || {};
+  const canCreateQuote = isAdmin || isManager || permissions.canCreateQuote;
+  const canEditQuote = isAdmin || isManager || permissions.canEditQuote;
+  const canSendQuote = isAdmin || isManager || permissions.canSendQuote;
 
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    // If they can't even see quotes, they shouldn't be here, 
+    // but the request didn't specify 'view' permission. 
+    // Usually 'team' can see quotes if it's their company?
+    // The previous code redirected if not Manager/Admin.
+    // I'll keep the view restriction for managers/admins OR if they have any quote permission.
+    if (!isManagerOrAdmin && !canCreateQuote && !canEditQuote && !canSendQuote) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
+  }, [isManagerOrAdmin, canCreateQuote, canEditQuote, canSendQuote, navigate]);
+
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -64,7 +77,7 @@ const Quotes = () => {
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
-      alert("You do not have permission to delete quotes.");
+      alert("You do not have permission to delete quotes. Only Admins and Managers can delete.");
       return;
     }
     if (!confirm("Are you sure you want to delete this quote?")) return;
@@ -228,9 +241,16 @@ const Quotes = () => {
       const clientDoc = await getDoc(doc(db, "clients", quote.clientId));
       const clientData = clientDoc.exists() ? clientDoc.data() : null;
       const clientPhone = clientData?.phone || "";
-      const clientAddress = clientData?.address ? 
-        `${clientData.address.street}, ${clientData.address.city}, ${clientData.address.postcode}` 
-        : "";
+      
+      let clientAddress = "";
+      if (clientData?.address) {
+        if (typeof clientData.address === 'string') {
+          clientAddress = clientData.address;
+        } else {
+          const { street = "", city = "", state = "", zip = "" } = clientData.address;
+          clientAddress = [street, city, state, zip].filter(Boolean).join(", ");
+        }
+      }
 
       await addDoc(collection(db, "jobs"), {
         title: `Job from Quote #${quote.quoteNumber}`,
@@ -267,18 +287,15 @@ const Quotes = () => {
         updatedAt: serverTimestamp(),
       });
 
-      // Confirm associated visits
+      // Remove the scheduled quote visit as requested
       const visitsRef = collection(db, "visits");
       const q = query(visitsRef, where("quoteId", "==", quote.id));
       const snapshot = await getDocs(q);
       
-      const updatePromises = snapshot.docs.map(visitDoc => 
-        updateDoc(doc(db, "visits", visitDoc.id), {
-          status: "confirmed",
-          updatedAt: serverTimestamp()
-        })
+      const deletePromises = snapshot.docs.map(visitDoc => 
+        deleteDoc(doc(db, "visits", visitDoc.id))
       );
-      await Promise.all(updatePromises);
+      await Promise.all(deletePromises);
 
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "jobs");
@@ -325,7 +342,7 @@ const Quotes = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Quotes</h1>
           <p className="text-muted-foreground">Create and manage professional quotes for your clients.</p>
         </div>
-        {impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+        {canCreateQuote && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
@@ -404,7 +421,12 @@ const Quotes = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg">{quote.clientName}</h3>
+                    <Link 
+                      to={`/dashboard/clients?search=${encodeURIComponent(quote.clientName)}`}
+                      className="font-bold text-lg hover:text-cyan-400 transition-colors"
+                    >
+                      {quote.clientName}
+                    </Link>
                     {getStatusBadge(quote.status)}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -426,7 +448,7 @@ const Quotes = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {quote.status !== 'approved' && impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+                  {quote.status !== 'approved' && canEditQuote && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -437,16 +459,18 @@ const Quotes = () => {
                       Approve & Job
                     </Button>
                   )}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => sendQuoteEmail(quote)}
-                    disabled={isSending === quote.id}
-                  >
-                    <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
-                  </Button>
-                  {isManagerOrAdmin && (
+                  {canSendQuote && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-white"
+                      onClick={() => sendQuoteEmail(quote)}
+                      disabled={isSending === quote.id}
+                    >
+                      <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
+                    </Button>
+                  )}
+                  {canEditQuote && (
                     <Button 
                       variant="ghost" 
                       size="icon" 

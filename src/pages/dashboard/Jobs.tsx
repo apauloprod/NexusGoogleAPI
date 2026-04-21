@@ -54,11 +54,18 @@ const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isManagerOrAdmin = isAdmin || isManager;
+  
+  const permissions = currentUserData?.permissions || {};
+  const canCreateJob = isAdmin || isManager || permissions.canCreateJob;
+  const canEditJob = isAdmin || isManager || permissions.canEditJob;
+  const canCreateInvoice = isAdmin || isManager || permissions.canCreateInvoice;
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
-      alert("You do not have permission to delete jobs.");
+      alert("You do not have permission to delete jobs. Only Admins and Managers can delete.");
       return;
     }
     if (!confirm("Are you sure you want to delete this job?")) return;
@@ -234,7 +241,7 @@ const Jobs = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Jobs</h1>
           <p className="text-muted-foreground">Track ongoing work, checklists, and project progress.</p>
         </div>
-        {isManagerOrAdmin && (
+        {canCreateJob && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
@@ -414,7 +421,7 @@ const Jobs = () => {
                 )}
                 <div className="h-8 w-px bg-white/5 mx-2" />
                 <div className="flex items-center gap-2">
-                  {job.status !== 'completed' && isManagerOrAdmin && (
+                  {job.status !== 'completed' && canCreateInvoice && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -434,7 +441,7 @@ const Jobs = () => {
                   >
                     <ImageIcon className="h-5 w-5" />
                   </Button>
-                  {isManagerOrAdmin && (
+                  {canEditJob && (
                     <Button 
                       variant="ghost" 
                       size="icon" 

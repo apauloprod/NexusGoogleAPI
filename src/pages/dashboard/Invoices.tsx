@@ -44,13 +44,20 @@ const Invoices = () => {
   const [searchParams] = useSearchParams();
   
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isManagerOrAdmin = isAdmin || isManager;
+  
+  const permissions = currentUserData?.permissions || {};
+  const canCreateInvoice = isAdmin || isManager || permissions.canCreateInvoice;
+  const canEditInvoice = isAdmin || isManager || permissions.canEditInvoice;
+  const canSendInvoice = isAdmin || isManager || permissions.canSendInvoice;
 
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    if (!isManagerOrAdmin && !canCreateInvoice && !canEditInvoice && !canSendInvoice) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
+  }, [isManagerOrAdmin, canCreateInvoice, canEditInvoice, canSendInvoice, navigate]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -258,7 +265,7 @@ const Invoices = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Invoices</h1>
           <p className="text-muted-foreground">Manage billing, track payments, and send professional invoices.</p>
         </div>
-        {impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+        {canCreateInvoice && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
@@ -382,23 +389,27 @@ const Invoices = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => sendInvoiceEmail(inv)}
-                    disabled={isSending === inv.id}
-                  >
-                    <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => setEditingInvoice(inv)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
+                  {canSendInvoice && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-white"
+                      onClick={() => sendInvoiceEmail(inv)}
+                      disabled={isSending === inv.id}
+                    >
+                      <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
+                    </Button>
+                  )}
+                  {canEditInvoice && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-white"
+                      onClick={() => setEditingInvoice(inv)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 

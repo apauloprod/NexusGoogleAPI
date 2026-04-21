@@ -58,6 +58,19 @@ import {
 
 import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 
+const permissionsList = [
+  { key: "canCreateQuote", label: "Create Quotes" },
+  { key: "canEditQuote", label: "Edit Quotes" },
+  { key: "canSendQuote", label: "Send Quotes" },
+  { key: "canCreateInvoice", label: "Create Invoices" },
+  { key: "canEditInvoice", label: "Edit Invoices" },
+  { key: "canSendInvoice", label: "Send Invoices" },
+  { key: "canCreateClient", label: "Create Clients" },
+  { key: "canEditClient", label: "Edit Clients" },
+  { key: "canCreateJob", label: "Create Jobs" },
+  { key: "canEditJob", label: "Edit Jobs" },
+];
+
 const Settings = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const [isSeeding, setIsSeeding] = useState(false);
@@ -80,8 +93,8 @@ const Settings = () => {
     address: {
       street: "",
       city: "",
-      postcode: "",
-      country: ""
+      state: "",
+      zip: "",
     }
   });
 
@@ -107,7 +120,7 @@ const Settings = () => {
           hourlyRate: data.hourlyRate || 0,
           jobVisibility: data.jobVisibility || "all",
           allowTeamSelfAssign: data.allowTeamSelfAssign || false,
-          address: data.address || { street: "", city: "", postcode: "", country: "" }
+          address: data.address || { street: "", city: "", state: "", zip: "" }
         });
       }
     });
@@ -262,12 +275,45 @@ const Settings = () => {
     }
   };
 
+  const togglePermission = async (userId: string, permissionKey: string, currentValue: boolean) => {
+    try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, {
+        [`permissions.${permissionKey}`]: !currentValue,
+        updatedAt: serverTimestamp()
+      });
+      if (selectedMember && selectedMember.id === userId) {
+        setSelectedMember({
+          ...selectedMember,
+          permissions: {
+            ...(selectedMember.permissions || {}),
+            [permissionKey]: !currentValue
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error updating permission:", error);
+    }
+  };
+
   const handleAddressChange = (address: string) => {
     setBusinessData({
       ...businessData,
       address: {
         ...businessData.address,
-        street: address, // For simplicity, we store the full address in street or split it if we want
+        street: address,
+      }
+    });
+  };
+
+  const handleAddressSelect = (data: { street?: string; city?: string; state?: string; zip?: string }) => {
+    setBusinessData({
+      ...businessData,
+      address: {
+        street: data.street || businessData.address.street,
+        city: data.city || businessData.address.city,
+        state: data.state || businessData.address.state,
+        zip: data.zip || businessData.address.zip,
       }
     });
   };
@@ -513,12 +559,53 @@ const Settings = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <Label>Business Address</Label>
-                  <AddressAutocomplete 
-                    value={businessData.address.street}
-                    onChange={handleAddressChange}
-                    placeholder="Enter business address..."
-                  />
+                  <div className="space-y-2">
+                    <Label>Street Address</Label>
+                    <AddressAutocomplete 
+                      value={businessData.address.street}
+                      onChange={handleAddressChange}
+                      onAddressSelect={handleAddressSelect}
+                      placeholder="Enter business address..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>City</Label>
+                      <Input 
+                        value={businessData.address.city}
+                        onChange={e => setBusinessData({
+                          ...businessData, 
+                          address: { ...businessData.address, city: e.target.value }
+                        })}
+                        placeholder="City"
+                        className="bg-white/5 border-white/10 rounded-xl h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>State</Label>
+                      <Input 
+                        value={businessData.address.state}
+                        onChange={e => setBusinessData({
+                          ...businessData, 
+                          address: { ...businessData.address, state: e.target.value }
+                        })}
+                        placeholder="State"
+                        className="bg-white/5 border-white/10 rounded-xl h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Zip Code</Label>
+                      <Input 
+                        value={businessData.address.zip}
+                        onChange={e => setBusinessData({
+                          ...businessData, 
+                          address: { ...businessData.address, zip: e.target.value }
+                        })}
+                        placeholder="Zip"
+                        className="bg-white/5 border-white/10 rounded-xl h-11"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -740,6 +827,28 @@ const Settings = () => {
                                           />
                                         </div>
                                       </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                      <h4 className="font-bold flex items-center gap-2">
+                                        <Shield className="h-4 w-4 text-purple-400" />
+                                        Team Permissions
+                                      </h4>
+                                      <div className="grid grid-cols-2 gap-3">
+                                        {permissionsList.map((perm) => (
+                                          <div key={perm.key} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                                            <Label className="text-xs font-medium cursor-pointer" htmlFor={`${selectedMember?.id}-${perm.key}`}>
+                                              {perm.label}
+                                            </Label>
+                                            <Checkbox 
+                                              id={`${selectedMember?.id}-${perm.key}`}
+                                              checked={!!selectedMember?.permissions?.[perm.key]}
+                                              onCheckedChange={() => togglePermission(selectedMember.id, perm.key, !!selectedMember?.permissions?.[perm.key])}
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <p className="text-[10px] text-muted-foreground italic mt-2">Note: Role-based defaults still apply. Admins always have full permissions.</p>
                                     </div>
 
                                     <div className="space-y-4">

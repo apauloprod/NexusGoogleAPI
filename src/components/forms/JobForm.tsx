@@ -146,9 +146,15 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       const clientData = clientDoc.exists() ? clientDoc.data() : null;
       const clientName = clientData?.name || "Unknown Client";
       const clientPhone = clientData?.phone || "";
-      const clientAddress = clientData?.address ? 
-        `${clientData.address.street}, ${clientData.address.city}, ${clientData.address.postcode}` 
-        : "";
+      let clientAddress = "";
+      if (clientData?.address) {
+        if (typeof clientData.address === 'string') {
+          clientAddress = clientData.address;
+        } else {
+          const { street = "", city = "", state = "", zip = "", postcode = "" } = clientData.address;
+          clientAddress = [street, city, state, zip || postcode].filter(Boolean).join(", ");
+        }
+      }
       
       const jobData = {
         ...values,

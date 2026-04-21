@@ -35,7 +35,13 @@ const Clients = () => {
   const navigate = useNavigate();
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isManagerOrAdmin = isAdmin || isManager;
+
+  const permissions = currentUserData?.permissions || {};
+  const canCreateClient = isAdmin || isManager || permissions.canCreateClient;
+  const canEditClient = isAdmin || isManager || permissions.canEditClient;
 
   // We allow team members to see clients, but not modify them
   /* 
@@ -109,7 +115,7 @@ const Clients = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Clients</h1>
           <p className="text-muted-foreground">Manage your customer database and communication history.</p>
         </div>
-        {isManagerOrAdmin && (
+        {canCreateClient && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-white text-black hover:bg-white/90 rounded-xl gap-2 font-bold">
@@ -172,17 +178,19 @@ const Clients = () => {
               onClick={() => setEditingClient(client)}
             >
               <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setClientToDelete(client);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {isManagerOrAdmin && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setClientToDelete(client);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               
               <div className="flex items-center gap-4 mb-6">
@@ -210,7 +218,7 @@ const Clients = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                <div className="flex items-center justify-between pt-6 border-t border-white/5">
                 <div className="flex gap-2">
                   <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase">
                     {client.jobsCount || 0} Jobs
@@ -218,7 +226,7 @@ const Clients = () => {
                   {getStatusBadge(client.status)}
                 </div>
                 <div className="flex gap-1">
-                  {isManagerOrAdmin && (
+                  {canEditClient && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={() => setEditingClient(client)}>
                       <Edit2 className="h-4 w-4" />
                     </Button>

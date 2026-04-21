@@ -288,6 +288,8 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           duration: values.duration || "1h",
           status: "pending",
           quoteId: quoteId,
+          items: values.items.map(i => ({ description: i.description, price: Number(i.price) })),
+          notes: values.notes || "",
           createdAt: serverTimestamp(),
         });
       }
