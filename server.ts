@@ -8,8 +8,20 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import dotenv from "dotenv";
 import Stripe from "stripe";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import fs from "fs";
 
 dotenv.config();
+
+// Initialize Firebase in Server
+const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+let db: any = null;
+if (fs.existsSync(firebaseConfigPath)) {
+  const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+}
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
@@ -45,6 +57,40 @@ async function startServer() {
   });
 
   const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+  // API Route to receive lead webhooks (from Facebook Ads, Zapier, Instagram)
+  app.post("/api/webhook/leads/:businessId", async (req, res) => {
+    const { businessId } = req.params;
+    const data = req.body;
+    
+    console.log(`[WEBHOOK] Received lead for business ${businessId}`, data);
+    
+    if (!db) {
+      return res.status(500).json({ error: "Database not initialized" });
+    }
+
+    try {
+      // Map common ad webhook fields to standard request format
+      const formattedRequest = {
+        name: data.full_name || data.name || data.firstName || "New Lead",
+        email: data.email || null,
+        phone: data.phone || data.phone_number || null,
+        address: data.city || data.address || null,
+        services: data.interested_in ? [data.interested_in] : [],
+        notes: `Source: ${data.source || "Ad Campaign"}\n${data.notes || ""}`,
+        status: "pending",
+        businessId: businessId,
+        source: data.source || "Marketing Campaign",
+        createdAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, "requests"), formattedRequest);
+      res.json({ success: true, id: docRef.id });
+    } catch (err: any) {
+      console.error("[WEBHOOK ERROR]", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // API Route to send quote email
   app.get("/api/send-quote", (req, res) => {

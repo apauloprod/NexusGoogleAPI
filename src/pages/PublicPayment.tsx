@@ -222,9 +222,15 @@ export default function PublicPayment() {
     <div className="min-h-screen bg-black flex items-center justify-center p-6">
       <Card className="w-full max-w-md bg-black border-white/10 text-white rounded-[2rem] overflow-hidden">
         <CardHeader className="pt-10 pb-6 text-center">
-          <div className="h-12 w-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <CreditCard className="h-6 w-6 text-white" />
-          </div>
+          {data?.businessLogo ? (
+            <div className="mx-auto mb-6 h-16 w-32 flex items-center justify-center">
+               <img src={data.businessLogo} alt="Business Logo" className="h-full object-contain" referrerPolicy="no-referrer" />
+            </div>
+          ) : (
+            <div className="h-12 w-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <CreditCard className="h-6 w-6 text-white" />
+            </div>
+          )}
           <CardTitle className="text-2xl font-bold tracking-tighter">
             Pay {type === "quote" ? "Quote" : "Invoice"}
           </CardTitle>

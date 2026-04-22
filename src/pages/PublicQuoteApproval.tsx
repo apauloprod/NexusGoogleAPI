@@ -199,9 +199,12 @@ export default function PublicQuoteApproval() {
               <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-widest">Quote Approval</Badge>
               <span className="text-muted-foreground text-sm">#{quote?.quoteNumber}</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">Review Your Quote</h1>
+            {quote?.businessLogo && (
+              <img src={quote.businessLogo} alt="Business Logo" className="h-16 object-contain mb-4" referrerPolicy="no-referrer" />
+            )}
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter">{quote?.businessName || "Review Your Quote"}</h1>
           </div>
-          <div className="text-right">
+          <div className="text-left md:text-right">
             <p className="text-muted-foreground text-sm">Amount Due</p>
             <p className="text-3xl font-bold">${quote?.total?.toLocaleString()}</p>
           </div>

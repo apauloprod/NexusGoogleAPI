@@ -396,6 +396,76 @@ const Timesheets = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {isManagerOrAdmin && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="bg-emerald-500 hover:bg-emerald-600 font-bold gap-2 text-white border-transparent">
+                  <DollarSign className="h-4 w-4" />
+                  Run Payroll
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-black border-white/10 text-white rounded-[2rem] sm:max-w-[700px] max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold tracking-tighter">Run Payroll</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-6 pt-4">
+                  <p className="text-sm text-muted-foreground">Select unpaid timesheets to mark as paid. Ensure you have transferred the funds to their respective payment methods.</p>
+                  
+                  {teamMembers.map(member => {
+                    const memberEntries = entries.filter(e => e.userId === member.id && !e.paid && e.status !== "active");
+                    if (memberEntries.length === 0) return null;
+                    
+                    const totalDuration = memberEntries.reduce((sum, e) => sum + (e.duration || 0), 0);
+                    const totalHours = totalDuration / 60;
+                    const amountOwed = totalHours * (member.hourlyRate || 0);
+
+                    return (
+                        <div key={member.id} className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 className="font-bold text-lg">{member.displayName || member.email}</h3>
+                                    <p className="text-xs text-muted-foreground">Rate: ${member.hourlyRate || 0}/hr</p>
+                                    <p className="text-xs text-muted-foreground">Payment Info: {member.paymentEmail || member.paymentNotes || 'Not set'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-bold text-xl text-emerald-400">${amountOwed.toFixed(2)}</p>
+                                    <p className="text-xs text-muted-foreground">{totalHours.toFixed(1)} hrs total</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2 mb-4">
+                                {memberEntries.map(entry => (
+                                    <div key={entry.id} className="flex justify-between text-xs p-2 bg-black/40 rounded-lg">
+                                        <span>{format(typeof entry.startTime === "string" ? parseISO(entry.startTime) : entry.startTime?.toDate() || new Date(), "MMM d, yyyy")}</span>
+                                        <span>{(entry.duration / 60).toFixed(1)} hrs</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button 
+                                onClick={async () => {
+                                    try {
+                                        for (const entry of memberEntries) {
+                                            await updateDoc(doc(db, "timesheets", entry.id), { paid: true });
+                                        }
+                                        alert("Timesheets marked as paid for " + (member.displayName || member.email));
+                                    } catch (err) {
+                                        console.error(err);
+                                    }
+                                }} 
+                                className="w-full bg-white text-black font-bold"
+                            >
+                                Mark {memberEntries.length} Entries as Paid
+                            </Button>
+                        </div>
+                    );
+                  })}
+                  {entries.filter(e => !e.paid && e.status !== "active" && teamMembers.find(m => m.id === e.userId)).length === 0 && (
+                      <div className="text-center p-8 text-muted-foreground">No unpaid timesheets to process.</div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
           <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="glass border-white/10 gap-2">

@@ -430,6 +430,7 @@ const Settings = () => {
           {[
             { id: "personal", icon: UserCircle, label: "Personal Profile", staffAllowed: true },
             { id: "profile", icon: Building2, label: "Business Profile", staffAllowed: false },
+            { id: "integrations", icon: Globe, label: "Integrations & Ads", staffAllowed: false },
             { id: "tasks", icon: Zap, label: "Custom Tasks", staffAllowed: false },
             { id: "data", icon: Database, label: "Data & Backup", staffAllowed: false },
           ].filter(item => {
@@ -507,6 +508,41 @@ const Settings = () => {
                       <p className="text-[10px] text-muted-foreground mt-1">This will be your default view when you load the schedule page.</p>
                     </div>
                   </div>
+                  <div className="pt-4 border-t border-white/5 space-y-4">
+                    <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground block">Payment Information (Payroll)</Label>
+                    <p className="text-xs text-muted-foreground mb-4">Add your preferred payment method so your team manager can process payouts for your timesheets.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label>PayPal Email / Zelle ID</Label>
+                        <Input 
+                          placeholder="payment@example.com"
+                          value={currentUserData?.paymentEmail || ""}
+                          onChange={async (e) => {
+                            if (!user) return;
+                            await updateDoc(doc(db, "users", user.uid), {
+                              paymentEmail: e.target.value
+                            });
+                          }}
+                          className="bg-white/5 border-white/10 rounded-xl h-11" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Additional Payment Notes (Optional)</Label>
+                        <Input 
+                          placeholder="e.g. Venmo @username or Routing info"
+                          value={currentUserData?.paymentNotes || ""}
+                          onChange={async (e) => {
+                            if (!user) return;
+                            await updateDoc(doc(db, "users", user.uid), {
+                              paymentNotes: e.target.value
+                            });
+                          }}
+                          className="bg-white/5 border-white/10 rounded-xl h-11" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="pt-4 border-t border-white/5">
                     <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 block">Assigned Role</Label>
                     <div className="flex items-center gap-3">
@@ -977,6 +1013,63 @@ const Settings = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab === "integrations" && (
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                  <Globe className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Marketing Integrations & Ads</h2>
+                  <p className="text-sm text-muted-foreground">Connect Facebook Ads, Instagram Ads, and Zapier straight into your Requests.</p>
+                </div>
+              </div>
+              
+              <div className="glass p-8 rounded-3xl border-white/5 space-y-8">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold">Inbound Webhook URL</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Use this URL in your Facebook/Instagram Lead Ads or Zapier configurations to automatically create Leads in your CRM. 
+                    Ensure you send a POST request with a JSON body matching your form fields.
+                  </p>
+                  
+                  <div className="p-4 bg-black/50 border border-white/10 rounded-xl font-mono text-sm break-all flex justify-between items-center">
+                    <span>{window.location.origin}/api/webhook/leads/{currentUserData?.businessId || "YOUR_BUSINESS_ID"}</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/api/webhook/leads/${currentUserData?.businessId}`);
+                        alert("Webhook URL copied to clipboard!");
+                      }}
+                      className="ml-4 shrink-0 bg-white/5 border-white/10"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator className="bg-white/5" />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold">Supported Payload Formats</h3>
+                  <p className="text-sm text-muted-foreground">Ensure your ad form maps to these fields for optimal recording into your Requests area:</p>
+                  <pre className="p-4 bg-[#0a0a0a] border border-white/5 rounded-xl text-xs text-muted-foreground overflow-x-auto">
+{`{
+  "full_name": "John Doe",      // Or "name", "firstName"
+  "email": "john@example.com",
+  "phone": "+15551234567",
+  "city": "Austin, TX",         // Or "address"
+  "interested_in": "Roofing",   // Added to services
+  "notes": "Saw the ad on IG",
+  "source": "Instagram Ads"     // Automatically tracked
+}`}
+                  </pre>
                 </div>
               </div>
             </section>

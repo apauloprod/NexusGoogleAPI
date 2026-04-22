@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
-import { collection, onSnapshot, query, where, doc, updateDoc, getDocs, orderBy, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, updateDoc, getDocs, orderBy, Timestamp, addDoc, serverTimestamp } from "firebase/firestore";
 import { 
   Dialog,
   DialogContent,
@@ -66,6 +66,35 @@ const Team = () => {
   const selectedMember = teamMembers.find(m => m.id === selectedMemberId);
   const [memberJobs, setMemberJobs] = useState<any[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
+  const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberName, setNewMemberName] = useState("");
+
+  const addTeamMember = async () => {
+    const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
+    if (!newMemberEmail || !newMemberName || !businessId) return;
+    try {
+      await addDoc(collection(db, "users"), {
+        email: newMemberEmail,
+        displayName: newMemberName,
+        role: "team",
+        businessId: businessId,
+        hourlyRate: 25, // Default rate
+        permissions: {
+          page_schedule: true,
+          page_jobs: true,
+          page_messages: true,
+          page_timesheets: true,
+        },
+        createdAt: serverTimestamp()
+      });
+      setNewMemberEmail("");
+      setNewMemberName("");
+      setIsAddMemberDialogOpen(false);
+    } catch (error) {
+      console.error("Error adding team member:", error);
+    }
+  };
 
   useEffect(() => {
     if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
@@ -159,16 +188,58 @@ const Team = () => {
           <h1 className="text-3xl font-bold tracking-tighter">Team Management</h1>
           <p className="text-muted-foreground">Manage roles, permissions, and track team assignments.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search team members..." 
-              className="pl-9 bg-white/5 border-white/10 w-64"
+              className="pl-9 bg-white/5 border-white/10 w-full sm:w-64"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          
+          <Dialog open={isAddMemberDialogOpen} onOpenChange={setIsAddMemberDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-white text-black hover:bg-white/90 gap-2 font-bold w-full sm:w-auto">
+                <Plus className="h-4 w-4" />
+                Add Team Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-black border-white/10 text-white rounded-[2rem]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold tracking-tighter">Add Team Member</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <Input 
+                    type="email"
+                    placeholder="member@example.com"
+                    value={newMemberEmail}
+                    onChange={(e) => setNewMemberEmail(e.target.value)}
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Display Name</Label>
+                  <Input 
+                    placeholder="John Doe"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    className="bg-white/5 border-white/10"
+                  />
+                </div>
+                <Button 
+                  onClick={addTeamMember}
+                  className="w-full bg-white text-black hover:bg-white/90 font-bold"
+                  disabled={!newMemberEmail || !newMemberName}
+                >
+                  Send Invite & Assing Access
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
