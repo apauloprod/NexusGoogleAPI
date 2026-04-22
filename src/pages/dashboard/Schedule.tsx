@@ -49,6 +49,17 @@ const Schedule = () => {
   }, [currentUserData?.preferredScheduleView]);
   const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
 
+  const ensureDate = (val: any) => {
+    if (!val) return null;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   const handleDelete = async () => {
     if (!itemToDelete) return;
     try {
@@ -101,7 +112,7 @@ const Schedule = () => {
       const newData = { ...prev, [type]: data };
       const merged = [...newData.visits, ...newData.jobs]
         .filter(item => item.scheduledAt)
-        .sort((a, b) => a.scheduledAt.toDate() - b.scheduledAt.toDate());
+        .sort((a, b) => (ensureDate(a.scheduledAt)?.getTime() || 0) - (ensureDate(b.scheduledAt)?.getTime() || 0));
       setVisits(merged);
       setLoading(false);
       return newData;
@@ -126,7 +137,8 @@ const Schedule = () => {
 
   const filteredVisits = visits.filter(item => {
     if (!item.scheduledAt) return false;
-    const date = item.scheduledAt.toDate();
+    const date = ensureDate(item.scheduledAt);
+    if (!date) return false;
     
     let isVisible = false;
     if (viewMode === 'timeline') {
@@ -161,7 +173,8 @@ const Schedule = () => {
 
   const groupedVisits = filteredVisits.reduce((acc, item) => {
     if (!item.scheduledAt) return acc;
-    const dateStr = item.scheduledAt.toDate().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const dateStr = ensureDate(item.scheduledAt)?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    if (!dateStr) return acc;
     if (!acc[dateStr]) acc[dateStr] = [];
     acc[dateStr].push(item);
     return acc;
@@ -259,7 +272,7 @@ const Schedule = () => {
               <VisitForm 
                 initialData={{
                   ...editingItem,
-                  scheduledAt: editingItem.scheduledAt?.toDate().toISOString() || ""
+                  scheduledAt: ensureDate(editingItem.scheduledAt)?.toISOString() || ""
                 }}
                 onSuccess={() => setEditingItem(null)} 
                 onCancel={() => setEditingItem(null)} 
@@ -295,7 +308,7 @@ const Schedule = () => {
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{item.notes || "No notes provided."}</p>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {item.scheduledAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {ensureDate(item.scheduledAt)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           <span className="flex items-center gap-1.5"><UserIcon className="h-3 w-3" /> {item.clientName}</span>
                           {item.address && <span className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {item.address}</span>}
                         </div>
@@ -321,7 +334,7 @@ const Schedule = () => {
           <div className="overflow-x-auto pb-6 -mx-8 px-8 no-scrollbar">
             <div className="flex gap-2 min-w-max">
               {visibleDays.map(day => {
-                const dayItems = filteredVisits.filter(v => isSameDay(v.scheduledAt.toDate(), day));
+                const dayItems = filteredVisits.filter(v => isSameDay(ensureDate(v.scheduledAt)!, day));
                 return (
                   <div key={day.toISOString()} className="flex-1 min-w-[120px] max-w-[160px] space-y-4">
                     <div className={cn(
@@ -363,7 +376,7 @@ const Schedule = () => {
                             <div className="space-y-2">
                               <p className="text-[10px] text-muted-foreground flex items-center gap-2 font-medium">
                                 <Clock className="h-3 w-3" />
-                                {format(item.scheduledAt.toDate(), 'h:mm a')}
+                                {format(ensureDate(item.scheduledAt)!, 'h:mm a')}
                               </p>
                               <p className="text-[10px] text-muted-foreground flex items-center gap-2 font-medium">
                                 <UserIcon className="h-3 w-3" />
@@ -402,10 +415,10 @@ const Schedule = () => {
             <div key={item.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
               <div className="w-24 text-center border-r border-white/10 pr-6">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                  {item.scheduledAt?.toDate().toLocaleDateString('en-US', { weekday: 'short' })}
+                  {ensureDate(item.scheduledAt)?.toLocaleDateString('en-US', { weekday: 'short' })}
                 </p>
                 <p className="text-3xl font-bold mt-1">
-                  {item.scheduledAt?.toDate().getDate()}
+                  {ensureDate(item.scheduledAt)?.getDate()}
                 </p>
               </div>
               <div className="flex-1">
@@ -426,7 +439,7 @@ const Schedule = () => {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {item.scheduledAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {ensureDate(item.scheduledAt)?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   <span className="flex items-center gap-1.5"><UserIcon className="h-4 w-4" /> {item.clientName}</span>
                   {item.address && <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {item.address}</span>}
                 </div>

@@ -25,6 +25,17 @@ export default function Overview() {
   });
   const [loading, setLoading] = useState(true);
 
+  const ensureDate = (val: any) => {
+    if (!val) return null;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
     const businessId = impersonatedUser?.businessId || currentUserData.businessId;
@@ -49,7 +60,7 @@ export default function Overview() {
       const revenue = docs
         .filter(job => {
           if (job.status !== "completed") return false;
-          const updatedAt = job.updatedAt?.toDate();
+          const updatedAt = ensureDate(job.updatedAt);
           return updatedAt && updatedAt >= firstDayOfMonth;
         })
         .reduce((sum, job) => sum + (job.total || 0), 0);

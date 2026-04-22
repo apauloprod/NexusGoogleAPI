@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { db } from "../firebase";
-import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, increment } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, increment, getDocs, query, where, deleteDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -104,9 +104,30 @@ export default function PublicPayment() {
               quoteNumber: data.quoteNumber,
               items: data.items || [],
               total: data.total,
+              scheduledAt: data.scheduledAt || null,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
+
+            // Cleanup visits if quote
+            if (data.visitId) {
+              try {
+                await deleteDoc(doc(db, "visits", data.visitId));
+              } catch (err) {
+                console.error("Visit cleanup error:", err);
+              }
+            } else {
+              try {
+                const visitsRef = collection(db, "visits");
+                const vq = query(visitsRef, where("quoteId", "==", id));
+                const vSnap = await getDocs(vq);
+                for (const d of vSnap.docs) {
+                  await deleteDoc(doc(db, "visits", d.id));
+                }
+              } catch (err) {
+                console.error("Visits cleanup error:", err);
+              }
+            }
 
             // Update client status
             const clientRef = doc(db, "clients", data.clientId);

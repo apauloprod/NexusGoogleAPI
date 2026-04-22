@@ -65,7 +65,7 @@ type QuoteFormValues = z.infer<typeof quoteSchema>;
 
 interface QuoteFormProps {
   initialData?: any;
-  onSuccess?: () => void;
+  onSuccess?: (quoteId?: string) => void;
   onCancel?: () => void;
 }
 
@@ -242,6 +242,8 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         businessId,
         clientName,
         total,
+        requestId: initialData?.requestId || null,
+        visitId: initialData?.visitId || initialData?.id || null, // If created from a visit, track it
         businessName: businessSettings?.businessName || "",
         businessLogo: businessSettings?.businessLogo || "",
         updatedAt: serverTimestamp(),
@@ -257,23 +259,6 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
           createdAt: serverTimestamp(),
         });
         quoteId = docRef.id;
-      }
-
-      // Send Email with PDF
-      if (clientEmail) {
-        try {
-          await fetch(`/api/send-quote`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              quote: { id: quoteId, ...quoteData },
-              clientEmail: clientEmail,
-              appUrl: window.location.origin,
-            }),
-          });
-        } catch (emailErr) {
-          console.error("Failed to send quote email:", emailErr);
-        }
       }
 
       // Handle scheduling
@@ -294,8 +279,25 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
         });
       }
 
+      // Send Email with PDF
+      if (clientEmail) {
+        try {
+          await fetch(`/api/send-quote`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              quote: { id: quoteId, ...quoteData },
+              clientEmail: clientEmail,
+              appUrl: window.location.origin,
+            }),
+          });
+        } catch (emailErr) {
+          console.error("Failed to send quote email:", emailErr);
+        }
+      }
+
       form.reset();
-      onSuccess?.();
+      onSuccess?.(quoteId);
     } catch (error) {
       console.error("Quote creation error:", error);
       handleFirestoreError(error, initialData?.id ? OperationType.UPDATE : OperationType.CREATE, "quotes");

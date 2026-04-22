@@ -8,7 +8,10 @@ import {
   Phone,
   Trash2,
   Share2,
-  Check
+  Check,
+  Filter,
+  ArrowUpDown,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +40,17 @@ const Requests = () => {
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
+  const ensureDate = (val: any) => {
+    if (!val) return null;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!isManagerOrAdmin) {
       navigate("/dashboard");
@@ -50,6 +64,8 @@ const Requests = () => {
   const [convertingRequest, setConvertingRequest] = useState<any>(null);
   const [requestToDelete, setRequestToDelete] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const copyPublicLink = () => {
     const bizId = impersonatedUser?.businessId || currentUserData?.businessId;
@@ -80,7 +96,7 @@ const Requests = () => {
     const q = query(
       collection(db, "requests"), 
       where("businessId", "==", businessId),
-      orderBy("createdAt", "desc")
+      orderBy(sortBy, sortOrder)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -90,7 +106,7 @@ const Requests = () => {
       handleFirestoreError(error, OperationType.LIST, "requests");
     });
     return () => unsubscribe();
-  }, [currentUserData?.businessId, impersonatedUser?.businessId]);
+  }, [currentUserData?.businessId, impersonatedUser?.businessId, sortBy, sortOrder]);
 
   const [isConverting, setIsConverting] = useState<string | null>(null);
 
@@ -156,10 +172,13 @@ const Requests = () => {
     }
   };
 
-  const onQuoteCreated = async () => {
+  const onQuoteCreated = async (quoteId: string) => {
     if (convertingRequest?.requestId) {
       const requestRef = doc(db, "requests", convertingRequest.requestId);
-      await updateDoc(requestRef, { status: "quoted" });
+      await updateDoc(requestRef, { 
+        status: "quoted",
+        quoteId: quoteId
+      });
     }
     setConvertingRequest(null);
   };
@@ -172,13 +191,33 @@ const Requests = () => {
           <p className="text-muted-foreground">Manage incoming quote requests from potential clients.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 h-9">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <select 
+              value={sortBy} 
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent border-none text-[10px] font-bold uppercase tracking-wider focus:ring-0 cursor-pointer h-7"
+            >
+              <option value="createdAt" className="bg-black">Date</option>
+              <option value="name" className="bg-black">Client Name</option>
+              <option value="status" className="bg-black">Status</option>
+            </select>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 ml-1" 
+              onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+            >
+              <ArrowUpDown className="h-3 w-3" />
+            </Button>
+          </div>
+            <Button 
             variant="outline" 
-            className="border-white/10 hover:bg-white/5 rounded-xl gap-2 font-bold"
+            className="border-white/10 hover:bg-white/5 rounded-xl gap-2 font-bold h-9 text-xs"
             onClick={copyPublicLink}
           >
             {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Share2 className="h-4 w-4" />}
-            {copied ? "Copied Link" : "Copy Form Link"}
+            {copied ? "Link" : "Copy Form Link"}
           </Button>
           {isManagerOrAdmin && (
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -260,6 +299,19 @@ const Requests = () => {
                     <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">
                       {req.status}
                     </Badge>
+                    {req.quoteId && (
+                      <Badge 
+                        variant="outline" 
+                        className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] uppercase tracking-wider cursor-pointer hover:bg-emerald-500/20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/quotes?search=${req.quoteId}`);
+                        }}
+                      >
+                        <FileText className="h-3 w-3 mr-1" />
+                        View Quote
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {req.email}</span>
@@ -283,7 +335,7 @@ const Requests = () => {
                     {req.items?.map((i: any) => i.description).join(", ") || "No services specified"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {req.createdAt?.toDate().toLocaleDateString()}
+                    {ensureDate(req.createdAt)?.toLocaleDateString()}
                   </p>
                 </div>
                   <div className="flex items-center gap-2">

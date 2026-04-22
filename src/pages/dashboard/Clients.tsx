@@ -40,17 +40,15 @@ const Clients = () => {
   const isManagerOrAdmin = isAdmin || isManager;
 
   const permissions = currentUserData?.permissions || {};
+  const canViewClient = isAdmin || isManager || permissions.viewClients;
   const canCreateClient = isAdmin || isManager || permissions.canCreateClient;
   const canEditClient = isAdmin || isManager || permissions.canEditClient;
 
-  // We allow team members to see clients, but not modify them
-  /* 
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    if (!isManagerOrAdmin && !canViewClient && !canCreateClient && !canEditClient) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
-  */
+  }, [isManagerOrAdmin, canViewClient, canCreateClient, canEditClient, navigate]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");

@@ -13,7 +13,8 @@ import {
   Send,
   Search,
   Filter,
-  Trash2
+  Trash2,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,15 +50,16 @@ const Invoices = () => {
   const isManagerOrAdmin = isAdmin || isManager;
   
   const permissions = currentUserData?.permissions || {};
+  const canViewInvoice = isAdmin || isManager || permissions.viewInvoices;
   const canCreateInvoice = isAdmin || isManager || permissions.canCreateInvoice;
   const canEditInvoice = isAdmin || isManager || permissions.canEditInvoice;
   const canSendInvoice = isAdmin || isManager || permissions.canSendInvoice;
 
   useEffect(() => {
-    if (!isManagerOrAdmin && !canCreateInvoice && !canEditInvoice && !canSendInvoice) {
+    if (!isManagerOrAdmin && !canViewInvoice && !canCreateInvoice && !canEditInvoice && !canSendInvoice) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, canCreateInvoice, canEditInvoice, canSendInvoice, navigate]);
+  }, [isManagerOrAdmin, canViewInvoice, canCreateInvoice, canEditInvoice, canSendInvoice, navigate]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -65,6 +67,8 @@ const Invoices = () => {
   const [isSending, setIsSending] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("invoiceNumber");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -93,7 +97,7 @@ const Invoices = () => {
     const q = query(
       collection(db, "invoices"), 
       where("businessId", "==", businessId),
-      orderBy("createdAt", "desc")
+      orderBy(sortBy, sortOrder)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -106,7 +110,7 @@ const Invoices = () => {
     });
 
     return () => unsubscribe();
-  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId, sortBy, sortOrder]);
 
   const sendInvoiceEmail = async (inv: any) => {
     setIsSending(inv.id);
@@ -244,18 +248,25 @@ const Invoices = () => {
     }
   };
 
+  const ensureDate = (val: any) => {
+    if (!val) return null;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = inv.id === searchTerm ||
+                          inv.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           inv.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           inv.jobId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           inv.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || inv.status === statusFilter;
     return matchesSearch && matchesStatus;
-  }).sort((a, b) => {
-    const dateA = a.dueDate ? a.dueDate.toDate().getTime() : 0;
-    const dateB = b.dueDate ? b.dueDate.toDate().getTime() : 0;
-    if (dateA !== dateB) return dateB - dateA; // Descending by due date
-    return (a.clientName || "").localeCompare(b.clientName || "");
   });
 
   return (
@@ -299,8 +310,8 @@ const Invoices = () => {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px] bg-white/5 border-white/10">
-            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+          <SelectTrigger className="w-full sm:w-[150px] bg-white/5 border-white/10 h-9 text-[10px] font-bold uppercase tracking-wider">
+            <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent className="bg-black border-white/10">
@@ -311,6 +322,29 @@ const Invoices = () => {
             <SelectItem value="overdue">Overdue</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 h-9 w-full sm:w-auto">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-transparent border-none text-[10px] font-bold uppercase tracking-wider focus:ring-0 cursor-pointer text-white h-7"
+          >
+            <option value="invoiceNumber" className="bg-black">Invoice #</option>
+            <option value="clientName" className="bg-black">Client Name</option>
+            <option value="createdAt" className="bg-black">Created Date</option>
+            <option value="total" className="bg-black">Total Amount</option>
+            <option value="status" className="bg-black">Status</option>
+          </select>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 ml-1" 
+            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+          >
+            <ArrowUpDown className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       <Dialog open={!!editingInvoice} onOpenChange={(open) => !open && setEditingInvoice(null)}>
@@ -323,7 +357,7 @@ const Invoices = () => {
               <InvoiceForm 
                 initialData={{
                   ...editingInvoice,
-                  dueDate: editingInvoice.dueDate?.toDate().toISOString().split('T')[0] || ""
+                  dueDate: ensureDate(editingInvoice.dueDate)?.toISOString().split('T')[0] || ""
                 }}
                 onSuccess={() => setEditingInvoice(null)} 
                 onCancel={() => setEditingInvoice(null)} 
@@ -352,7 +386,7 @@ const Invoices = () => {
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">#{inv.invoiceNumber || inv.id.slice(0, 6)}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Due {inv.dueDate?.toDate().toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Due {ensureDate(inv.dueDate)?.toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center gap-4 mt-1">
                     {inv.quoteNumber && (

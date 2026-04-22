@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { doc, getDoc, updateDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, addDoc, collection, deleteDoc, getDocs, query as firestoreQuery, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,9 +87,31 @@ export default function PublicQuoteApproval() {
         quoteNumber: quote.quoteNumber,
         items: quote.items || [],
         total: quote.total,
+        scheduledAt: quote.scheduledAt || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      // 2.1 Remove quote visit from schedule if exists
+      if (quote.visitId) {
+        try {
+          await deleteDoc(doc(db, "visits", quote.visitId));
+        } catch (err) {
+          console.error("Failed to delete visit:", err);
+        }
+      } else {
+        // Fallback: delete any visit associated with this quote
+        try {
+          const visitsRef = collection(db, "visits");
+          const vq = firestoreQuery(visitsRef, where("quoteId", "==", quoteId));
+          const vSnap = await getDocs(vq);
+          for (const d of vSnap.docs) {
+            await deleteDoc(doc(db, "visits", d.id));
+          }
+        } catch (err) {
+          console.error("Failed to cleanup visits:", err);
+        }
+      }
 
       // 3. Update Client Status
       const clientRef = doc(db, "clients", quote.clientId);

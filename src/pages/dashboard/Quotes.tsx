@@ -14,7 +14,8 @@ import {
   Filter,
   Download, 
   Edit2,
-  Trash2
+  Trash2,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,20 +53,16 @@ const Quotes = () => {
   const isManagerOrAdmin = isAdmin || isManager;
   
   const permissions = currentUserData?.permissions || {};
+  const canViewQuote = isAdmin || isManager || permissions.viewQuotes;
   const canCreateQuote = isAdmin || isManager || permissions.canCreateQuote;
   const canEditQuote = isAdmin || isManager || permissions.canEditQuote;
   const canSendQuote = isAdmin || isManager || permissions.canSendQuote;
 
   useEffect(() => {
-    // If they can't even see quotes, they shouldn't be here, 
-    // but the request didn't specify 'view' permission. 
-    // Usually 'team' can see quotes if it's their company?
-    // The previous code redirected if not Manager/Admin.
-    // I'll keep the view restriction for managers/admins OR if they have any quote permission.
-    if (!isManagerOrAdmin && !canCreateQuote && !canEditQuote && !canSendQuote) {
+    if (!isManagerOrAdmin && !canViewQuote && !canCreateQuote && !canEditQuote && !canSendQuote) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, canCreateQuote, canEditQuote, canSendQuote, navigate]);
+  }, [isManagerOrAdmin, canViewQuote, canCreateQuote, canEditQuote, canSendQuote, navigate]);
 
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +71,8 @@ const Quotes = () => {
   const [isSending, setIsSending] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("quoteNumber");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -102,7 +101,7 @@ const Quotes = () => {
     const q = query(
       collection(db, "quotes"), 
       where("businessId", "==", businessId),
-      orderBy("createdAt", "desc")
+      orderBy(sortBy, sortOrder)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -115,7 +114,7 @@ const Quotes = () => {
     });
 
     return () => unsubscribe();
-  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId, sortBy, sortOrder]);
 
   const sendQuoteEmail = async (quote: any) => {
     setIsSending(quote.id);
@@ -287,16 +286,16 @@ const Quotes = () => {
         updatedAt: serverTimestamp(),
       });
 
-      // Remove the scheduled quote visit as requested
+      // Cleanup visits
       const visitsRef = collection(db, "visits");
-      const q = query(visitsRef, where("quoteId", "==", quote.id));
-      const snapshot = await getDocs(q);
-      
-      const deletePromises = snapshot.docs.map(visitDoc => 
-        deleteDoc(doc(db, "visits", visitDoc.id))
-      );
-      await Promise.all(deletePromises);
-
+      const vq = query(visitsRef, where("quoteId", "==", quote.id));
+      const vSnap = await getDocs(vq);
+      for (const d of vSnap.docs) {
+        await deleteDoc(doc(db, "visits", d.id));
+      }
+      if (quote.visitId && !vSnap.docs.some(d => d.id === quote.visitId)) {
+        await deleteDoc(doc(db, "visits", quote.visitId)).catch(() => {});
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "jobs");
     }
@@ -317,22 +316,21 @@ const Quotes = () => {
 
   const ensureDate = (val: any) => {
     if (!val) return null;
-    if (typeof val.toDate === 'function') return val.toDate();
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
     if (val instanceof Date) return val;
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? null : d;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = quote.id === searchTerm ||
+                          quote.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           quote.clientName?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
     return matchesSearch && matchesStatus;
-  }).sort((a, b) => {
-    const dateA = ensureDate(a.scheduledAt)?.getTime() || Number.MAX_SAFE_INTEGER;
-    const dateB = ensureDate(b.scheduledAt)?.getTime() || Number.MAX_SAFE_INTEGER;
-    if (dateA !== dateB) return dateA - dateB;
-    return (a.clientName || "").localeCompare(b.clientName || "");
   });
 
   return (
@@ -376,8 +374,8 @@ const Quotes = () => {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px] bg-white/5 border-white/10">
-            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+          <SelectTrigger className="w-full sm:w-[150px] bg-white/5 border-white/10 h-9 text-[10px] font-bold uppercase tracking-wider">
+            <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent className="bg-black border-white/10">
@@ -388,6 +386,29 @@ const Quotes = () => {
             <SelectItem value="declined">Declined</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 h-9 w-full sm:w-auto">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-transparent border-none text-[10px] font-bold uppercase tracking-wider focus:ring-0 cursor-pointer text-white h-7"
+          >
+            <option value="quoteNumber" className="bg-black text-xs font-sans">Quote #</option>
+            <option value="clientName" className="bg-black text-xs font-sans">Client Name</option>
+            <option value="createdAt" className="bg-black text-xs font-sans">Created Date</option>
+            <option value="total" className="bg-black text-xs font-sans">Total Amount</option>
+            <option value="status" className="bg-black text-xs font-sans">Status</option>
+          </select>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 ml-1" 
+            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+          >
+            <ArrowUpDown className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       <Dialog open={!!editingQuote} onOpenChange={(open) => !open && setEditingQuote(null)}>

@@ -42,6 +42,17 @@ const Team = () => {
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
+  const ensureDate = (val: any) => {
+    if (!val) return null;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (!isManagerOrAdmin) {
       navigate("/dashboard");
@@ -51,7 +62,8 @@ const Team = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const selectedMember = teamMembers.find(m => m.id === selectedMemberId);
   const [memberJobs, setMemberJobs] = useState<any[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
 
@@ -94,12 +106,12 @@ const Team = () => {
   };
 
   useEffect(() => {
-    if (selectedMember) {
-      fetchMemberJobs(selectedMember.id);
+    if (selectedMemberId) {
+      fetchMemberJobs(selectedMemberId);
     } else {
       setMemberJobs([]);
     }
-  }, [selectedMember]);
+  }, [selectedMemberId]);
 
   const filteredTeam = teamMembers.filter(m => 
     (m.displayName || m.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -107,16 +119,21 @@ const Team = () => {
   );
 
   const permissionsList = [
+    { id: 'viewClients', label: 'View Clients' },
+    { id: 'canCreateClient', label: 'Create Client' },
+    { id: 'canEditClient', label: 'Edit Client' },
+    { id: 'viewQuotes', label: 'View Quotes' },
     { id: 'canCreateQuote', label: 'Create Quote' },
     { id: 'canEditQuote', label: 'Edit Quote' },
     { id: 'canSendQuote', label: 'Send Quote' },
+    { id: 'viewInvoices', label: 'View Invoices' },
     { id: 'canCreateInvoice', label: 'Create Invoice' },
     { id: 'canEditInvoice', label: 'Edit Invoice' },
     { id: 'canSendInvoice', label: 'Send Invoice' },
-    { id: 'canCreateClient', label: 'Create Client' },
-    { id: 'canEditClient', label: 'Edit Client' },
+    { id: 'viewJobs', label: 'View Jobs' },
     { id: 'canCreateJob', label: 'Create Job' },
     { id: 'canEditJob', label: 'Edit Job' },
+    { id: 'viewRequests', label: 'View Requests' },
   ];
 
   const togglePermission = async (memberId: string, permissionId: string, current: boolean) => {
@@ -176,10 +193,10 @@ const Team = () => {
                   filteredTeam.map((member) => (
                     <div 
                       key={member.id}
-                      onClick={() => setSelectedMember(member)}
+                      onClick={() => setSelectedMemberId(member.id)}
                       className={cn(
                         "p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group",
-                        selectedMember?.id === member.id 
+                        selectedMemberId === member.id 
                           ? "bg-white/10 border-white/20" 
                           : "bg-white/5 border-transparent hover:border-white/10"
                       )}
@@ -259,33 +276,24 @@ const Team = () => {
 
                   <Separator className="bg-white/5" />
 
-                  <div>
-                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 block">Granular Permissions</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {permissionsList.map((perm) => (
-                        <div key={perm.id} className="flex items-center space-x-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
-                          <Checkbox 
-                            id={`${selectedMember.id}-${perm.id}`}
-                            checked={selectedMember.role === 'admin' || selectedMember.role === 'manager' || selectedMember.permissions?.[perm.id]}
-                            disabled={selectedMember.role === 'admin' || selectedMember.role === 'manager'}
-                            onCheckedChange={() => togglePermission(selectedMember.id, perm.id, selectedMember.permissions?.[perm.id])}
-                            className="border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
-                          />
-                          <label 
-                            htmlFor={`${selectedMember.id}-${perm.id}`}
-                            className="text-sm font-medium leading-none cursor-pointer select-none"
-                          >
-                            {perm.label}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    {(selectedMember.role === 'admin' || selectedMember.role === 'manager') && (
-                      <p className="mt-4 text-[10px] text-muted-foreground italic flex items-center gap-1">
-                        <Shield className="h-3 w-3" />
-                        Managers and Admins have all permissions by default.
-                      </p>
-                    )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {permissionsList.map((perm) => (
+                      <div key={perm.id} className="flex items-center space-x-2 px-3 h-8 rounded-lg bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
+                        <Checkbox 
+                          id={`${selectedMember.id}-${perm.id}`}
+                          checked={selectedMember.role === 'admin' || selectedMember.role === 'manager' || selectedMember.permissions?.[perm.id]}
+                          disabled={selectedMember.role === 'admin' || selectedMember.role === 'manager'}
+                          onCheckedChange={() => togglePermission(selectedMember.id, perm.id, !!selectedMember.permissions?.[perm.id])}
+                          className="h-3.5 w-3.5 border-white/20 data-[state=checked]:bg-white data-[state=checked]:text-black"
+                        />
+                        <label 
+                          htmlFor={`${selectedMember.id}-${perm.id}`}
+                          className="text-[10px] font-bold uppercase tracking-wider cursor-pointer select-none"
+                        >
+                          {perm.label}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -312,7 +320,7 @@ const Team = () => {
                               <p className="text-sm font-bold truncate pr-2">{job.title}</p>
                               <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1">
                                 <Calendar className="h-3 w-3" />
-                                {job.scheduledAt?.toDate().toLocaleDateString()}
+                                {ensureDate(job.scheduledAt)?.toLocaleDateString()}
                               </div>
                             </div>
                             <Badge className={cn(

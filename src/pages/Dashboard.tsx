@@ -316,6 +316,14 @@ const Sidebar = ({
           to="/dashboard/timesheets" 
           active={location.pathname === "/dashboard/timesheets"} 
         />
+        {(userRole === 'admin' || userRole === 'manager' || userRole === 'super-admin') && (
+          <SidebarItem 
+            icon={Users} 
+            label="Team" 
+            to="/dashboard/team" 
+            active={location.pathname === "/dashboard/team"} 
+          />
+        )}
         <SidebarItem 
           icon={Settings} 
           label="Settings" 
@@ -491,7 +499,6 @@ export default function Dashboard() {
       return [
         ...baseItems,
         { icon: Users, label: "Clients", to: "/dashboard/clients" },
-        { icon: Users, label: "Team", to: "/dashboard/team" },
         { icon: FileText, label: "Requests", to: "/dashboard/requests" },
         { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
         { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" }, // Moved here for admins to follow flow

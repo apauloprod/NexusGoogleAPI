@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { 
   Plus, 
   CheckSquare,
@@ -11,6 +11,7 @@ import {
   MoreVertical,
   FileText,
   Search,
+  ArrowUpDown,
   Filter,
   Phone,
   MapPin,
@@ -42,6 +43,7 @@ import { formatPhoneNumber } from "../../lib/phone";
 
 const Jobs = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [jobs, setJobs] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -52,6 +54,8 @@ const Jobs = () => {
   const [isConverting, setIsConverting] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("scheduledAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isAdmin = role === 'admin';
@@ -59,9 +63,16 @@ const Jobs = () => {
   const isManagerOrAdmin = isAdmin || isManager;
   
   const permissions = currentUserData?.permissions || {};
+  const canViewJob = isAdmin || isManager || permissions.viewJobs;
   const canCreateJob = isAdmin || isManager || permissions.canCreateJob;
   const canEditJob = isAdmin || isManager || permissions.canEditJob;
   const canCreateInvoice = isAdmin || isManager || permissions.canCreateInvoice;
+
+  useEffect(() => {
+    if (!isManagerOrAdmin && !canViewJob && !canCreateJob && !canEditJob) {
+      navigate("/dashboard");
+    }
+  }, [isManagerOrAdmin, canViewJob, canCreateJob, canEditJob, navigate]);
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -95,7 +106,7 @@ const Jobs = () => {
     const q = query(
       collection(db, "jobs"), 
       where("businessId", "==", businessId),
-      orderBy("createdAt", "desc")
+      orderBy(sortBy, sortOrder)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -108,7 +119,7 @@ const Jobs = () => {
     });
 
     return () => unsubscribe();
-  }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
+  }, [user, currentUserData?.businessId, impersonatedUser?.businessId, sortBy, sortOrder]);
 
   const convertToInvoice = async (job: any) => {
     setIsConverting(job.id);
@@ -165,7 +176,7 @@ const Jobs = () => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              invoice: { id: invoiceId, ...invoiceData, dueDate: invoiceData.dueDate.toDate().toISOString() },
+              invoice: { id: invoiceId, ...invoiceData, dueDate: ensureDate(invoiceData.dueDate)?.toISOString() },
               clientEmail: clientData.email,
               appUrl: window.location.origin,
             }),
@@ -209,30 +220,35 @@ const Jobs = () => {
     }
   };
 
+  const ensureDate = (val: any) => {
+    if (!val) return null;
+    if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = job.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = job.id === searchTerm ||
+                          job.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           job.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          job.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          job.id?.toLowerCase().includes(searchTerm.toLowerCase());
+                          job.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || job.status === statusFilter;
     
     if (!matchesSearch || !matchesStatus) return false;
 
     // Privacy Logic:
-    const role = impersonatedUser?.role || currentUserData?.role || 'staff';
-    const visibility = currentUserData?.jobVisibility || 'all';
     const currentUserId = impersonatedUser?.uid || user?.uid;
+    const visibility = currentUserData?.jobVisibility || 'all';
 
     if (role !== 'admin' && role !== 'manager' && visibility === 'own') {
       return (job.assignedTeam || []).includes(currentUserId);
     }
 
     return true;
-  }).sort((a, b) => {
-    const dateA = a.scheduledAt ? a.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
-    const dateB = b.scheduledAt ? b.scheduledAt.toDate().getTime() : Number.MAX_SAFE_INTEGER;
-    if (dateA !== dateB) return dateA - dateB;
-    return (a.clientName || "").localeCompare(b.clientName || "");
   });
 
   return (
@@ -276,7 +292,7 @@ const Jobs = () => {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px] bg-white/5 border-white/10">
+          <SelectTrigger className="w-full sm:w-[150px] bg-white/5 border-white/10 h-10">
             <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
@@ -288,6 +304,28 @@ const Jobs = () => {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 h-10 w-full sm:w-auto">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-transparent border-none text-[10px] font-bold uppercase tracking-wider focus:ring-0 cursor-pointer text-white"
+          >
+            <option value="scheduledAt" className="bg-black">Date</option>
+            <option value="clientName" className="bg-black">Client</option>
+            <option value="status" className="bg-black">Status</option>
+            <option value="createdAt" className="bg-black">Created</option>
+          </select>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 ml-1" 
+            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+          >
+            <ArrowUpDown className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       <Dialog open={!!editingJob} onOpenChange={(open) => !open && setEditingJob(null)}>
@@ -346,7 +384,7 @@ const Jobs = () => {
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1 font-medium">
                       <Clock className="h-3 w-3" /> 
-                      {job.scheduledAt ? job.scheduledAt.toDate().toLocaleString() : "Unscheduled"}
+                      {job.scheduledAt ? ensureDate(job.scheduledAt)?.toLocaleString() : "Unscheduled"}
                     </span>
                     {job.clientPhone && (
                       <span className="flex items-center gap-1 border-l border-white/10 pl-4">
