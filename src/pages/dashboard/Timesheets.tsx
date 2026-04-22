@@ -446,6 +446,22 @@ const Timesheets = () => {
                                         for (const entry of memberEntries) {
                                             await updateDoc(doc(db, "timesheets", entry.id), { paid: true });
                                         }
+                                        
+                                        const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
+                                        
+                                        // Create expense record
+                                        await addDoc(collection(db, "expenses"), {
+                                          businessId: businessId,
+                                          date: serverTimestamp(),
+                                          category: "Payroll",
+                                          description: `Payroll for ${member.displayName || member.email} (${totalHours.toFixed(1)} hrs)`,
+                                          amount: amountOwed,
+                                          vendor: member.displayName || member.email,
+                                          status: "paid",
+                                          receiptUrl: "",
+                                          createdAt: serverTimestamp()
+                                        });
+
                                         alert("Timesheets marked as paid for " + (member.displayName || member.email));
                                     } catch (err) {
                                         console.error(err);

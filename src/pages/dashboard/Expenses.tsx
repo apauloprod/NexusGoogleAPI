@@ -356,13 +356,13 @@ const Expenses = () => {
             <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
               <TrendingUp className="h-5 w-5 text-emerald-400" />
             </div>
-            <span className="text-sm font-medium text-muted-foreground">Projected Revenue</span>
+            <span className="text-sm font-medium text-muted-foreground">Projected Revenue MTD</span>
           </div>
           <div className="flex items-baseline gap-2">
             <h2 className="text-3xl font-bold text-emerald-400">
               ${(projectionData[projectionData.length - 1]?.projection || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </h2>
-            <span className="text-xs text-muted-foreground">Next Month</span>
+            <span className="text-xs text-muted-foreground">Based on requests & active jobs</span>
           </div>
         </div>
       </div>

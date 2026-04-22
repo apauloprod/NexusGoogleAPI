@@ -354,14 +354,19 @@ async function startServer() {
   });
 
   app.post("/api/create-checkout-session", async (req, res) => {
-    const { amount, currency, description, metadata, successUrl, cancelUrl } = req.body;
+    const { amount, currency, description, metadata, successUrl, cancelUrl, businessStripeKey } = req.body;
 
-    if (!stripe) {
-      return res.status(500).json({ error: "Stripe not configured. Please add STRIPE_SECRET_KEY to environment variables." });
+    // Use individual business key if provided, fallback to global environment key
+    const effectiveStripeKey = businessStripeKey || process.env.STRIPE_SECRET_KEY;
+    
+    if (!effectiveStripeKey) {
+      return res.status(500).json({ error: "Stripe not configured. The business owner has not connected Stripe." });
     }
 
     try {
-      const session = await stripe.checkout.sessions.create({
+      const customStripe = new Stripe(effectiveStripeKey);
+      
+      const session = await customStripe.checkout.sessions.create({
         payment_method_types: ["card"], // You can add "paypal" here if enabled in Stripe
         line_items: [
           {

@@ -19,7 +19,8 @@ import {
   Image as ImageIcon,
   Plus,
   Clock,
-  UserCircle
+  UserCircle,
+  CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -1031,6 +1032,45 @@ const Settings = () => {
               </div>
               
               <div className="glass p-8 rounded-3xl border-white/5 space-y-8">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-purple-400" />
+                    Stripe Payment Processing
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Connect your Stripe account by entering your API keys to securely accept payments from clients on their quote and invoice pages.
+                  </p>
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label>Stripe Public Key</Label>
+                      <Input 
+                        placeholder="pk_live_..."
+                        value={businessData?.stripePublicKey || ""}
+                        onChange={(e) => setBusinessData(prev => ({ ...prev, stripePublicKey: e.target.value }))}
+                        className="bg-white/5 border-white/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Stripe Secret Key</Label>
+                      <Input 
+                        type="password"
+                        placeholder="sk_live_..."
+                        value={businessData?.stripeSecretKey || ""}
+                        onChange={(e) => setBusinessData(prev => ({ ...prev, stripeSecretKey: e.target.value }))}
+                        className="bg-white/5 border-white/10"
+                      />
+                    </div>
+                    <Button 
+                      onClick={handleSaveBusiness} 
+                      className="bg-white text-black hover:bg-white/90"
+                    >
+                      Save Stripe Settings
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator className="bg-white/5" />
+
                 <div className="space-y-4">
                   <h3 className="text-lg font-bold">Inbound Webhook URL</h3>
                   <p className="text-sm text-muted-foreground">

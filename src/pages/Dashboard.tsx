@@ -496,7 +496,6 @@ export default function Dashboard() {
     const baseItems = [
       { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
       { icon: Calendar, label: "Schedule", to: "/dashboard/schedule", permission: 'page_schedule' },
-      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs", permission: 'page_jobs' },
       { icon: MessageSquare, label: "Messages", to: "/dashboard/messages", permission: 'page_messages' },
     ];
 
@@ -504,6 +503,7 @@ export default function Dashboard() {
       { icon: Users, label: "Clients", to: "/dashboard/clients", permission: 'page_clients' },
       { icon: FileText, label: "Requests", to: "/dashboard/requests", permission: 'page_requests' },
       { icon: FileText, label: "Quotes", to: "/dashboard/quotes", permission: 'page_quotes' },
+      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs", permission: 'page_jobs' },
       { icon: FileText, label: "Invoices", to: "/dashboard/invoices", permission: 'page_invoices' },
       { icon: CreditCard, label: "Payments", to: "/dashboard/payments", permission: 'page_payments' },
       { icon: DollarSign, label: "Expenses", to: "/dashboard/expenses", permission: 'page_expenses' },

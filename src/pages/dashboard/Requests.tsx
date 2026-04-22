@@ -66,6 +66,7 @@ const Requests = () => {
   const [editingRequest, setEditingRequest] = useState<any>(null);
   const [convertingRequest, setConvertingRequest] = useState<any>(null);
   const [requestToDelete, setRequestToDelete] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [copied, setCopied] = useState(false);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -194,6 +195,22 @@ const Requests = () => {
           <p className="text-muted-foreground">Manage incoming quote requests from potential clients.</p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-white/5 p-1 border border-white/10 rounded-xl">
+            <Button 
+              className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+              onClick={() => setViewMode('grid')}
+              variant="ghost"
+            >
+              Grid
+            </Button>
+            <Button 
+              className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'list' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+              onClick={() => setViewMode('list')}
+              variant="ghost"
+            >
+              List
+            </Button>
+          </div>
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 h-9">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <select 
@@ -290,86 +307,123 @@ const Requests = () => {
         ) : requests.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No requests found.</div>
         ) : (
-          requests.map((req) => (
-            <div key={req.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
-              <div className="flex items-center gap-6 cursor-pointer" onClick={() => setEditingRequest(req)}>
-                <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <UserIcon className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg">{req.name}</h3>
-                    <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">
-                      {req.status}
-                    </Badge>
-                    {req.quoteId && (
-                      <Badge 
-                        variant="outline" 
-                        className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] uppercase tracking-wider cursor-pointer hover:bg-emerald-500/20"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/dashboard/quotes?search=${req.quoteId}`);
-                        }}
-                      >
-                        <FileText className="h-3 w-3 mr-1" />
-                        View Quote
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {req.email}</span>
-                    {req.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {formatPhoneNumber(req.phone)}</span>}
-                    <a 
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([req.address, req.city, req.state, req.zip].filter(Boolean).join(", "))}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MapPin className="h-3 w-3 text-cyan-400" /> 
-                      {[req.address, req.city, req.state, req.zip].filter(Boolean).join(", ")}
-                    </a>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right hidden md:block">
-                  <p className="text-sm font-medium text-white max-w-[200px] truncate">
-                    {req.items?.map((i: any) => i.description).join(", ") || "No services specified"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {ensureDate(req.createdAt)?.toLocaleDateString()}
-                  </p>
-                </div>
-                  <div className="flex items-center gap-2">
-                    {req.status === 'pending' && impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-white/10 hover:bg-white/5 text-xs h-8"
-                        onClick={() => handleConvertToQuote(req)}
-                        disabled={isConverting === req.id}
-                      >
-                        {isConverting === req.id ? "Converting..." : "Convert to Quote"}
-                      </Button>
-                    )}
-                    {isManagerOrAdmin && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-muted-foreground hover:text-destructive" 
-                        onClick={() => handleDelete(req.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white" onClick={() => setEditingRequest(req)}>
-                      <ArrowUpRight className="h-5 w-5" />
-                    </Button>
-                  </div>
-              </div>
+          viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+               {requests.map((req) => (
+                 <div key={req.id} className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden cursor-pointer" onClick={() => setEditingRequest(req)}>
+                   <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                     {isManagerOrAdmin && (
+                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     )}
+                   </div>
+                   <div className="flex items-center gap-4 mb-6">
+                     <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                       <UserIcon className="h-7 w-7 text-muted-foreground group-hover:text-white transition-colors" />
+                     </div>
+                     <div>
+                       <h3 className="font-bold text-xl">{req.name}</h3>
+                       <p className="text-sm text-muted-foreground">{ensureDate(req.createdAt)?.toLocaleDateString()}</p>
+                     </div>
+                   </div>
+                   <div className="space-y-3 mb-6">
+                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                       <Mail className="h-4 w-4 shrink-0" />
+                       <span className="truncate">{req.email}</span>
+                     </div>
+                     {req.phone && (
+                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                         <Phone className="h-4 w-4 shrink-0" />
+                         <span>{formatPhoneNumber(req.phone)}</span>
+                       </div>
+                     )}
+                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                       <MapPin className="h-4 w-4 shrink-0 text-cyan-400" />
+                       <span className="truncate">{[req.address, req.city, req.state, req.zip].filter(Boolean).join(", ")}</span>
+                     </div>
+                   </div>
+                   <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                     <div className="flex gap-2">
+                       <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">{req.status}</Badge>
+                     </div>
+                     <div className="flex gap-2">
+                        {req.status === 'pending' && (!isManagerOrAdmin ? null : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-white/10 hover:bg-white/5 text-xs h-8"
+                            onClick={(e) => { e.stopPropagation(); handleConvertToQuote(req); }}
+                            disabled={isConverting === req.id}
+                          >
+                            {isConverting === req.id ? "Converting..." : "Convert"}
+                          </Button>
+                        ))}
+                     </div>
+                   </div>
+                 </div>
+               ))}
             </div>
-          ))
+          ) : (
+            <div className="glass rounded-3xl border-white/5 overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="border-b border-white/5 bg-white/5">
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Name</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Contact</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Location / Details</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Status</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-white/5">
+                     {requests.map((req) => (
+                       <tr key={req.id} className="hover:bg-white/5 transition-colors cursor-pointer group" onClick={() => setEditingRequest(req)}>
+                         <td className="p-4">
+                           <div className="font-bold">{req.name}</div>
+                           <div className="text-xs text-muted-foreground">{ensureDate(req.createdAt)?.toLocaleDateString()}</div>
+                         </td>
+                         <td className="p-4">
+                           <div className="text-sm">{req.email}</div>
+                           {req.phone && <div className="text-xs text-muted-foreground">{formatPhoneNumber(req.phone)}</div>}
+                         </td>
+                         <td className="p-4 hidden md:table-cell">
+                           <div className="text-sm truncate max-w-[200px]">{[req.address, req.city, req.state, req.zip].filter(Boolean).join(", ")}</div>
+                           <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                             {req.items?.map((i: any) => i.description).join(", ") || "No services specified"}
+                           </div>
+                         </td>
+                         <td className="p-4">
+                           <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase tracking-wider">{req.status}</Badge>
+                         </td>
+                         <td className="p-4 text-right">
+                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {req.status === 'pending' && impersonatedUser?.role !== 'team' && currentUserData?.role !== 'team' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="border-white/10 hover:bg-white/5 text-xs h-8"
+                                  onClick={(e) => { e.stopPropagation(); handleConvertToQuote(req); }}
+                                  disabled={isConverting === req.id}
+                                >
+                                  {isConverting === req.id ? "Converting..." : "Convert Quote"}
+                                </Button>
+                              )}
+                              {isManagerOrAdmin && (
+                                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+          )
         )}
       </div>
     </div>

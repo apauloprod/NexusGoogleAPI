@@ -75,6 +75,7 @@ const Quotes = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("quoteNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -375,6 +376,22 @@ const Quotes = () => {
             className="pl-9 bg-white/5 border-white/10"
           />
         </div>
+        <div className="flex items-center gap-1 bg-white/5 p-1 border border-white/10 rounded-xl">
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('grid')}
+            variant="ghost"
+          >
+            Grid
+          </Button>
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'list' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('list')}
+            variant="ghost"
+          >
+            List
+          </Button>
+        </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[150px] bg-white/5 border-white/10 h-9 text-[10px] font-bold uppercase tracking-wider">
             <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
@@ -436,95 +453,196 @@ const Quotes = () => {
         ) : filteredQuotes.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No quotes found matching your criteria.</div>
         ) : (
-          filteredQuotes.map((quote) => (
-            <div key={quote.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
-              <div className="flex items-center gap-6">
-                <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <Link 
-                      to={`/dashboard/clients?search=${encodeURIComponent(quote.clientName)}`}
-                      className="font-bold text-lg hover:text-cyan-400 transition-colors"
-                    >
-                      {quote.clientName}
-                    </Link>
-                    {getStatusBadge(quote.status)}
+          viewMode === 'grid' ? (
+            filteredQuotes.map((quote) => (
+              <div key={quote.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+                <div className="flex items-center gap-6">
+                  <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">#{quote.quoteNumber || quote.id.slice(0, 6)}</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> 
-                      {quote.scheduledAt ? ensureDate(quote.scheduledAt)?.toLocaleString() : ensureDate(quote.createdAt)?.toLocaleDateString()}
-                    </span>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <Link 
+                        to={`/dashboard/clients?search=${encodeURIComponent(quote.clientName)}`}
+                        className="font-bold text-lg hover:text-cyan-400 transition-colors"
+                      >
+                        {quote.clientName}
+                      </Link>
+                      {getStatusBadge(quote.status)}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">#{quote.quoteNumber || quote.id.slice(0, 6)}</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> 
+                        {quote.scheduledAt ? ensureDate(quote.scheduledAt)?.toLocaleString() : ensureDate(quote.createdAt)?.toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-8">
-                <div className="text-right">
-                  <p className="text-lg font-bold text-white">
-                    ${quote.total?.toLocaleString() || "0.00"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {quote.items?.length || 0} items
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {quote.status !== 'approved' && canEditQuote && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-xs gap-1 hover:text-emerald-500"
-                      onClick={() => convertToJob(quote)}
-                    >
-                      <Briefcase className="h-3 w-3" />
-                      Approve & Job
-                    </Button>
-                  )}
-                  {canSendQuote && (
+                <div className="flex items-center gap-8">
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-white">
+                      ${quote.total?.toLocaleString() || "0.00"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {quote.items?.length || 0} items
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {quote.status !== 'approved' && canEditQuote && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs gap-1 hover:text-emerald-500"
+                        onClick={() => convertToJob(quote)}
+                      >
+                        <Briefcase className="h-3 w-3" />
+                        Approve & Job
+                      </Button>
+                    )}
+                    {canSendQuote && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-white"
+                        onClick={() => sendQuoteEmail(quote)}
+                        disabled={isSending === quote.id}
+                      >
+                        <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
+                      </Button>
+                    )}
+                    {canEditQuote && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-white"
+                        onClick={() => setEditingQuote(quote)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isManagerOrAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(quote.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => sendQuoteEmail(quote)}
-                      disabled={isSending === quote.id}
+                      onClick={() => downloadQuote(quote)}
                     >
-                      <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
+                      <Download className="h-5 w-5" />
                     </Button>
-                  )}
-                  {canEditQuote && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-white"
-                      onClick={() => setEditingQuote(quote)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {isManagerOrAdmin && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(quote.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => downloadQuote(quote)}
-                  >
-                    <Download className="h-5 w-5" />
-                  </Button>
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="glass rounded-3xl border-white/5 overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="border-b border-white/5 bg-white/5">
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Quote</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Client</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Date</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Amount</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Status</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-white/5">
+                     {filteredQuotes.map((quote) => (
+                       <tr key={quote.id} className="hover:bg-white/5 transition-colors group">
+                         <td className="p-4">
+                           <div className="font-bold">#{quote.quoteNumber || quote.id.slice(0, 6)}</div>
+                         </td>
+                         <td className="p-4">
+                           <Link 
+                            to={`/dashboard/clients?search=${encodeURIComponent(quote.clientName)}`}
+                            className="font-bold text-sm hover:text-cyan-400 transition-colors"
+                          >
+                            {quote.clientName}
+                          </Link>
+                         </td>
+                         <td className="p-4 hidden md:table-cell">
+                           <div className="text-sm text-muted-foreground">
+                             {quote.scheduledAt ? ensureDate(quote.scheduledAt)?.toLocaleString() : ensureDate(quote.createdAt)?.toLocaleDateString()}
+                           </div>
+                         </td>
+                         <td className="p-4">
+                           <div className="font-bold">${quote.total?.toLocaleString() || "0.00"}</div>
+                           <div className="text-xs text-muted-foreground">{quote.items?.length || 0} items</div>
+                         </td>
+                         <td className="p-4">
+                           {getStatusBadge(quote.status)}
+                         </td>
+                         <td className="p-4 text-right">
+                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {quote.status !== 'approved' && canEditQuote && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-xs gap-1 hover:text-emerald-500 h-8"
+                                  onClick={() => convertToJob(quote)}
+                                >
+                                  <Briefcase className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {canSendQuote && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-white h-8 w-8"
+                                  onClick={() => sendQuoteEmail(quote)}
+                                  disabled={isSending === quote.id}
+                                >
+                                  <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
+                                </Button>
+                              )}
+                              {canEditQuote && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-white h-8 w-8"
+                                  onClick={() => setEditingQuote(quote)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {isManagerOrAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-destructive h-8 w-8"
+                                  onClick={() => handleDelete(quote.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-muted-foreground hover:text-white h-8 w-8"
+                                onClick={() => downloadQuote(quote)}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
             </div>
-          ))
+          )
         )}
       </div>
     </div>

@@ -57,6 +57,7 @@ const Clients = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [clientToDelete, setClientToDelete] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const handleDelete = async () => {
     if (!clientToDelete) return;
@@ -155,97 +156,191 @@ const Clients = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="relative mb-8">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-        <Input 
-          placeholder="Search by name or email..." 
-          className="pl-12 bg-white/5 border-white/10 rounded-2xl h-14 text-lg focus:ring-white/20"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            placeholder="Search by name or email..." 
+            className="pl-12 bg-white/5 border-white/10 rounded-2xl h-14 text-lg focus:ring-white/20"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 bg-white/5 p-1 border border-white/10 rounded-2xl">
+          <Button 
+            className={`h-12 px-6 rounded-xl ${viewMode === 'grid' ? 'bg-white/10 text-white shadow"-[0_0_15px_rgba(255,255,255,0.05)]' : 'bg-transparent text-muted-foreground hover:text-white hover:bg-white/5'} transition-all`}
+            onClick={() => setViewMode('grid')}
+            variant="ghost"
+          >
+            Grid
+          </Button>
+          <Button 
+            className={`h-12 px-6 rounded-xl ${viewMode === 'list' ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'bg-transparent text-muted-foreground hover:text-white hover:bg-white/5'} transition-all`}
+            onClick={() => setViewMode('list')}
+            variant="ghost"
+          >
+            List
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {loading ? (
-          <div className="col-span-full h-32 flex items-center justify-center text-muted-foreground">Loading clients...</div>
-        ) : filteredClients.length === 0 ? (
-          <div className="col-span-full h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No clients found.</div>
-        ) : (
-          filteredClients.map((client) => (
-            <div 
-              key={client.id} 
-              className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden cursor-pointer"
-              onClick={() => setEditingClient(client)}
-            >
-              <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                {isManagerOrAdmin && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setClientToDelete(client);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                  <Users className="h-7 w-7 text-muted-foreground group-hover:text-white transition-colors" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-xl">{client.name}</h3>
-                  <p className="text-sm text-muted-foreground">{client.company || 'Individual Client'}</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <Mail className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{client.email}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <Phone className="h-4 w-4 shrink-0" />
-                  <span>{formatPhoneNumber(client.phone)}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{client.address}</span>
-                </div>
-              </div>
-
-                <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase">
-                    {client.jobsCount || 0} Jobs
-                  </Badge>
-                  {getStatusBadge(client.status)}
-                </div>
-                <div className="flex gap-1">
-                  {canEditClient && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={() => setEditingClient(client)}>
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  )}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {loading ? (
+            <div className="col-span-full h-32 flex items-center justify-center text-muted-foreground">Loading clients...</div>
+          ) : filteredClients.length === 0 ? (
+            <div className="col-span-full h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No clients found.</div>
+          ) : (
+            filteredClients.map((client) => (
+              <div 
+                key={client.id} 
+                className="p-6 rounded-3xl glass border-white/5 hover:border-white/10 transition-all group relative overflow-hidden cursor-pointer"
+                onClick={() => setEditingClient(client)}
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                   {isManagerOrAdmin && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setClientToDelete(client)}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setClientToDelete(client);
+                      }}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white" onClick={() => navigate(`/dashboard/jobs?search=${client.name}`)}>
-                    View Jobs
-                    <ArrowUpRight className="h-3 w-3" />
-                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                    <Users className="h-7 w-7 text-muted-foreground group-hover:text-white transition-colors" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xl">{client.name}</h3>
+                    <p className="text-sm text-muted-foreground">{client.company || 'Individual Client'}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{client.email}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0" />
+                    <span>{formatPhoneNumber(client.phone)}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{client.address}</span>
+                  </div>
+                </div>
+
+                  <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] uppercase">
+                      {client.jobsCount || 0} Jobs
+                    </Badge>
+                    {getStatusBadge(client.status)}
+                  </div>
+                  <div className="flex gap-1">
+                    {canEditClient && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={(e) => { e.stopPropagation(); setEditingClient(client); }}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isManagerOrAdmin && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); setClientToDelete(client); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/jobs?search=${client.name}`); }}>
+                      View Jobs
+                      <ArrowUpRight className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="glass rounded-3xl border-white/5 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/5">
+                  <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Client</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Contact</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Location</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Status / Jobs</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {loading ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Loading clients...</td></tr>
+                ) : filteredClients.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No clients found.</td></tr>
+                ) : (
+                  filteredClients.map((client) => (
+                    <tr 
+                      key={client.id} 
+                      className="hover:bg-white/5 transition-colors cursor-pointer group"
+                      onClick={() => setEditingClient(client)}
+                    >
+                      <td className="p-4">
+                        <div className="font-bold">{client.name}</div>
+                        <div className="text-xs text-muted-foreground">{client.company || 'Individual Client'}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm">{client.email}</div>
+                        <div className="text-xs text-muted-foreground">{formatPhoneNumber(client.phone)}</div>
+                      </td>
+                      <td className="p-4 hidden md:table-cell text-sm text-muted-foreground align-middle">
+                        {client.address && client.address.length > 30 ? client.address.substring(0, 30) + '...' : client.address}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          {getStatusBadge(client.status)}
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{client.jobsCount || 0} Jobs</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {canEditClient && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-white" onClick={(e) => { e.stopPropagation(); setEditingClient(client); }}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {isManagerOrAdmin && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClientToDelete(client);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" className="text-xs gap-1 hover:text-white" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/jobs?search=${client.name}`); }}>
+                            <ArrowUpRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
         <DialogContent className="bg-black border-white/10 text-white sm:max-w-[400px] rounded-[2rem]">

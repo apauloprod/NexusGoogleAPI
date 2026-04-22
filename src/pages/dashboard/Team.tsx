@@ -235,7 +235,7 @@ const Team = () => {
                   className="w-full bg-white text-black hover:bg-white/90 font-bold"
                   disabled={!newMemberEmail || !newMemberName}
                 >
-                  Send Invite & Assing Access
+                  Send Invite & Assign Access
                 </Button>
               </div>
             </DialogContent>

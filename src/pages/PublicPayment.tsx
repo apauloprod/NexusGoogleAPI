@@ -5,6 +5,7 @@ import { doc, getDoc, addDoc, collection, serverTimestamp, updateDoc, increment,
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { CreditCard, ShieldCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 
@@ -33,7 +34,12 @@ export default function PublicPayment() {
         if (docSnap.exists()) {
           const docData = docSnap.data();
           setData(docData);
-          setAmount(docData.total.toString());
+          if (type === "invoice") {
+            const balance = Math.max(0, docData.total - (docData.paidAmount || 0));
+            setAmount(balance.toString());
+          } else {
+            setAmount(docData.total.toString());
+          }
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -147,6 +153,20 @@ export default function PublicPayment() {
   const handlePayment = async () => {
     setProcessing(true);
     try {
+      // First try to fetch the business's individual Stripe key to allow them to collect payment directly
+      let businessStripeKey = "";
+      if (data?.businessId) {
+        try {
+          const bizRef = doc(db, "businesses", data.businessId);
+          const bizSnap = await getDoc(bizRef);
+          if (bizSnap.exists()) {
+             businessStripeKey = bizSnap.data().stripeSecretKey || "";
+          }
+        } catch(e) {
+           console.error("Error fetching individual Stripe key", e);
+        }
+      }
+
       const response = await fetch(`/api/create-checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -161,6 +181,7 @@ export default function PublicPayment() {
           },
           successUrl: `${window.location.origin}/#/pay?success=true&type=${type}&id=${id}`,
           cancelUrl: window.location.href,
+          businessStripeKey: businessStripeKey
         }),
       });
 
@@ -244,10 +265,16 @@ export default function PublicPayment() {
               <span className="text-sm text-muted-foreground">Total Amount</span>
               <span className="text-xl font-bold">${data.total.toLocaleString()}</span>
             </div>
+            {type === "invoice" && data.paidAmount > 0 && (
+              <div className="flex justify-between items-center mb-2 text-emerald-400">
+                <span className="text-sm">Amount Paid</span>
+                <span className="text-sm font-bold">-${data.paidAmount.toLocaleString()}</span>
+              </div>
+            )}
             <Separator className="my-4 bg-white/5" />
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                Amount to Pay
+                {type === "invoice" ? "Amount to Pay (Balance: $" + Math.max(0, data.total - (data.paidAmount || 0)) + ")" : "Amount to Pay"}
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -279,7 +306,3 @@ export default function PublicPayment() {
     </div>
   );
 }
-
-const Separator = ({ className }: { className?: string }) => (
-  <div className={`h-px w-full ${className}`} />
-);

@@ -71,6 +71,7 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("invoiceNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -311,6 +312,22 @@ const Invoices = () => {
             className="pl-9 bg-white/5 border-white/10"
           />
         </div>
+        <div className="flex items-center gap-1 bg-white/5 p-1 border border-white/10 rounded-xl">
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('grid')}
+            variant="ghost"
+          >
+            Grid
+          </Button>
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'list' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('list')}
+            variant="ghost"
+          >
+            List
+          </Button>
+        </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[150px] bg-white/5 border-white/10 h-9 text-[10px] font-bold uppercase tracking-wider">
             <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
@@ -375,99 +392,199 @@ const Invoices = () => {
         ) : filteredInvoices.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No invoices found matching your criteria.</div>
         ) : (
-          filteredInvoices.map((inv) => (
-            <div key={inv.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
-              <div className="flex items-center gap-6">
-                <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-muted-foreground" />
+          viewMode === 'grid' ? (
+            filteredInvoices.map((inv) => (
+              <div key={inv.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+                <div className="flex items-center gap-6">
+                  <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-bold text-lg">{inv.clientName}</h3>
+                      {getStatusBadge(inv.status)}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">#{inv.invoiceNumber || inv.id.slice(0, 6)}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Due {ensureDate(inv.dueDate)?.toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-1">
+                      {inv.quoteNumber && (
+                        <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                          Quote: 
+                          <Link to={`/dashboard/quotes?search=${inv.quoteNumber}`} className="text-cyan-400 hover:underline">
+                            {inv.quoteNumber}
+                          </Link>
+                        </div>
+                      )}
+                      {inv.jobId && (
+                        <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                          Job: 
+                          <Link to={`/dashboard/jobs?search=${inv.jobId}`} className="text-amber-400 hover:underline">
+                            {inv.jobTitle || inv.jobId.slice(0, 8)}
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg">{inv.clientName}</h3>
-                    {getStatusBadge(inv.status)}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">#{inv.invoiceNumber || inv.id.slice(0, 6)}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Due {ensureDate(inv.dueDate)?.toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-4 mt-1">
-                    {inv.quoteNumber && (
-                      <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
-                        Quote: 
-                        <Link to={`/dashboard/quotes?search=${inv.quoteNumber}`} className="text-cyan-400 hover:underline">
-                          {inv.quoteNumber}
-                        </Link>
-                      </div>
-                    )}
-                    {inv.jobId && (
-                      <div className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
-                        Job: 
-                        <Link to={`/dashboard/jobs?search=${inv.jobId}`} className="text-amber-400 hover:underline">
-                          {inv.jobTitle || inv.jobId.slice(0, 8)}
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-8">
-                <div className="text-right">
-                  <p className="text-lg font-bold text-white">
-                    ${inv.total?.toLocaleString() || "0.00"}
-                  </p>
-                  <div className="flex flex-col items-end gap-0.5 mt-1">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
-                      {inv.items?.length || 0} items
+                <div className="flex items-center gap-8">
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-white">
+                      ${inv.total?.toLocaleString() || "0.00"}
                     </p>
-                    <p className="text-xs text-muted-foreground text-emerald-500">
-                      {inv.status === 'paid' ? 'Fully Paid' : `$${(inv.total - (inv.paidAmount || 0)).toLocaleString()} balance`}
-                    </p>
+                    <div className="flex flex-col items-end gap-0.5 mt-1">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                        {inv.items?.length || 0} items
+                      </p>
+                      <p className="text-xs text-muted-foreground text-emerald-500">
+                        {inv.status === 'paid' ? 'Fully Paid' : `$${(inv.total - (inv.paidAmount || 0)).toLocaleString()} balance`}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {canSendInvoice && (
+                  <div className="flex items-center gap-2">
+                    {canSendInvoice && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-white"
+                        onClick={() => sendInvoiceEmail(inv)}
+                        disabled={isSending === inv.id}
+                      >
+                        <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
+                      </Button>
+                    )}
+                    {canEditInvoice && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-white"
+                        onClick={() => setEditingInvoice(inv)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => sendInvoiceEmail(inv)}
-                      disabled={isSending === inv.id}
+                      onClick={() => downloadInvoice(inv)}
                     >
-                      <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
+                      <Download className="h-5 w-5" />
                     </Button>
-                  )}
-                  {canEditInvoice && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-white"
-                      onClick={() => setEditingInvoice(inv)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => downloadInvoice(inv)}
-                  >
-                    <Download className="h-5 w-5" />
-                  </Button>
-                  {isManagerOrAdmin && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(inv.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                    {isManagerOrAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(inv.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="glass rounded-3xl border-white/5 overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="border-b border-white/5 bg-white/5">
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Invoice</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Client</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Dates / Ref</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Amount</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Status</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-white/5">
+                     {filteredInvoices.map((inv) => (
+                       <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
+                         <td className="p-4">
+                           <div className="font-bold">#{inv.invoiceNumber || inv.id.slice(0, 6)}</div>
+                         </td>
+                         <td className="p-4">
+                           <div className="font-bold text-sm">{inv.clientName}</div>
+                         </td>
+                         <td className="p-4 hidden md:table-cell">
+                           <div className="flex items-center gap-1 text-sm text-muted-foreground whitespace-nowrap">
+                             <Clock className="h-3 w-3" /> Due {ensureDate(inv.dueDate)?.toLocaleDateString()}
+                           </div>
+                           <div className="flex items-center gap-2 mt-1">
+                            {inv.quoteNumber && (
+                              <div className="text-[10px] uppercase font-bold text-muted-foreground">
+                                Quote: <Link to={`/dashboard/quotes?search=${inv.quoteNumber}`} className="text-cyan-400 hover:underline">{inv.quoteNumber}</Link>
+                              </div>
+                            )}
+                            {inv.jobId && (
+                              <div className="text-[10px] uppercase font-bold text-muted-foreground">
+                                Job: <Link to={`/dashboard/jobs?search=${inv.jobId}`} className="text-amber-400 hover:underline">{inv.jobTitle || inv.jobId.slice(0, 8)}</Link>
+                              </div>
+                            )}
+                           </div>
+                         </td>
+                         <td className="p-4">
+                           <div className="font-bold">${inv.total?.toLocaleString() || "0.00"}</div>
+                           <div className="text-[10px] text-muted-foreground">
+                             {inv.status === 'paid' ? 'Fully Paid' : `$${(inv.total - (inv.paidAmount || 0)).toLocaleString()} bal`}
+                           </div>
+                         </td>
+                         <td className="p-4">
+                           {getStatusBadge(inv.status)}
+                         </td>
+                         <td className="p-4 text-right">
+                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {canSendInvoice && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-white h-8 w-8"
+                                  onClick={() => sendInvoiceEmail(inv)}
+                                  disabled={isSending === inv.id}
+                                >
+                                  <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
+                                </Button>
+                              )}
+                              {canEditInvoice && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-white h-8 w-8"
+                                  onClick={() => setEditingInvoice(inv)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-muted-foreground hover:text-white h-8 w-8"
+                                onClick={() => downloadInvoice(inv)}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              {isManagerOrAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-destructive h-8 w-8"
+                                  onClick={() => handleDelete(inv.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
             </div>
-          ))
+          )
         )}
       </div>
     </div>

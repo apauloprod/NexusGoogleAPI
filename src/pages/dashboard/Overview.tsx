@@ -22,6 +22,7 @@ export default function Overview() {
     activeJobs: 0,
     unpaidInvoices: 0,
     revenueMTD: 0,
+    projectedRevenueMTD: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +41,9 @@ export default function Overview() {
     if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
     const businessId = impersonatedUser?.businessId || currentUserData.businessId;
 
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     // Listen to requests
     const qRequests = query(collection(db, "requests"), where("businessId", "==", businessId));
     const unsubRequests = onSnapshot(qRequests, (snapshot) => {
@@ -47,33 +51,38 @@ export default function Overview() {
       setStats(prev => ({ ...prev, pendingRequests: pending }));
     });
 
-    // Listen to jobs for active count and revenue
+    // Listen to jobs for active count and projected revenue
     const qJobs = query(collection(db, "jobs"), where("businessId", "==", businessId));
     const unsubJobs = onSnapshot(qJobs, (snapshot) => {
       const docs = snapshot.docs.map(doc => doc.data());
       const active = docs.filter(job => job.status === "active").length;
       
-      // Calculate Revenue MTD (from completed jobs)
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
-      const revenue = docs
+      const projected = docs
         .filter(job => {
-          if (job.status !== "completed") return false;
-          const updatedAt = ensureDate(job.updatedAt);
-          return updatedAt && updatedAt >= firstDayOfMonth;
+          if (job.status === "cancelled") return false;
+          const createdAt = ensureDate(job.createdAt);
+          return createdAt && createdAt >= firstDayOfMonth;
         })
         .reduce((sum, job) => sum + (job.total || 0), 0);
 
-      setStats(prev => ({ ...prev, activeJobs: active, revenueMTD: revenue }));
+      setStats(prev => ({ ...prev, activeJobs: active, projectedRevenueMTD: projected }));
       setLoading(false);
     });
 
-    // Listen to invoices
+    // Listen to invoices for actual revenue and unpaid
     const qInvoices = query(collection(db, "invoices"), where("businessId", "==", businessId));
     const unsubInvoices = onSnapshot(qInvoices, (snapshot) => {
-      const unpaid = snapshot.docs.filter(doc => doc.data().status !== "paid").length;
-      setStats(prev => ({ ...prev, unpaidInvoices: unpaid }));
+      const docs = snapshot.docs.map(doc => doc.data());
+      const unpaid = docs.filter(doc => doc.status !== "paid").length;
+      
+      // Actual Revenue: Paid invoices
+      const revenue = docs.reduce((sum, inv) => {
+        // use paidAmount, or sum totals of paid invoices
+        // If it's a paid or partially paid invoice, we add the paidAmount.
+        return sum + (Number(inv.paidAmount) || 0);
+      }, 0);
+
+      setStats(prev => ({ ...prev, unpaidInvoices: unpaid, revenueMTD: revenue }));
     });
 
     return () => {
@@ -98,28 +107,28 @@ export default function Overview() {
       adminOnly: true
     },
     { 
+      label: "Actual Revenue (ytd)", 
+      value: `$${stats.revenueMTD.toLocaleString()}`, 
+      icon: CreditCard, 
+      color: "text-purple-400",
+      path: "/dashboard/payments",
+      adminOnly: true
+    },
+    { 
+      label: "Unpaid Invoices", 
+      value: stats.unpaidInvoices.toString(), 
+      icon: TrendingUp, 
+      color: "text-amber-400",
+      path: "/dashboard/invoices",
+      adminOnly: true
+    },
+    { 
       label: "Active Jobs", 
       value: stats.activeJobs.toString(), 
       icon: CheckSquare, 
       color: "text-emerald-400",
       path: "/dashboard/jobs",
       adminOnly: false
-    },
-    { 
-      label: "Unpaid Invoices", 
-      value: stats.unpaidInvoices.toString(), 
-      icon: FileText, 
-      color: "text-amber-400",
-      path: "/dashboard/invoices",
-      adminOnly: true
-    },
-    { 
-      label: "Revenue (MTD)", 
-      value: `$${stats.revenueMTD.toLocaleString()}`, 
-      icon: CreditCard, 
-      color: "text-purple-400",
-      path: "/dashboard/payments",
-      adminOnly: true
     },
   ].filter(card => !card.adminOnly || isManagerOrAdmin);
 

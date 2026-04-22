@@ -56,6 +56,7 @@ const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("scheduledAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isAdmin = role === 'admin';
@@ -293,6 +294,22 @@ const Jobs = () => {
             className="pl-9 bg-white/5 border-white/10"
           />
         </div>
+        <div className="flex items-center gap-1 bg-white/5 p-1 border border-white/10 rounded-xl">
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('grid')}
+            variant="ghost"
+          >
+            Grid
+          </Button>
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'list' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('list')}
+            variant="ghost"
+          >
+            List
+          </Button>
+        </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[150px] bg-white/5 border-white/10 h-10">
             <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -369,143 +386,251 @@ const Jobs = () => {
         ) : filteredJobs.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No jobs found matching your criteria.</div>
         ) : (
-          filteredJobs.map((job) => (
-            <div key={job.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
-              <div className="flex items-center gap-6">
-                <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <CheckSquare className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg">
-                      {job.items?.[0]?.description ? `${job.items[0].description}${job.items.length > 1 ? ` (+${job.items.length - 1} more)` : ''} - ` : ''}
-                      {job.clientName}
-                    </h3>
-                    {getStatusBadge(job.status)}
+          viewMode === 'grid' ? (
+            filteredJobs.map((job) => (
+              <div key={job.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+                <div className="flex items-center gap-6">
+                  <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <CheckSquare className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                    <span className="flex items-center gap-1 font-medium">
-                      <Clock className="h-3 w-3" /> 
-                      {job.scheduledAt ? ensureDate(job.scheduledAt)?.toLocaleString() : "Unscheduled"}
-                    </span>
-                    {job.clientPhone && (
-                      <span className="flex items-center gap-1 border-l border-white/10 pl-4">
-                        <Phone className="h-3 w-3 text-cyan-400" />
-                        {formatPhoneNumber(job.clientPhone)}
-                      </span>
-                    )}
-                    {job.clientAddress && (
-                      <a 
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.clientAddress)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 border-l border-white/10 pl-4 hover:text-cyan-400 transition-colors"
-                      >
-                        <MapPin className="h-3 w-3 text-cyan-400" />
-                        {job.clientAddress}
-                      </a>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground mt-2">
-                    <div className="flex -space-x-2 mr-2">
-                      {(job.assignedTeam || []).map((memberId: string) => {
-                        const member = teamMembers.find(m => m.id === memberId);
-                        return (
-                          <div 
-                            key={memberId} 
-                            title={member?.displayName || member?.email || memberId}
-                            className="h-6 w-6 rounded-full border-2 border-black bg-white/10 flex items-center justify-center overflow-hidden"
-                          >
-                            {member?.photoURL ? (
-                              <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-                            ) : (
-                              <UserIcon className="h-3 w-3" />
-                            )}
-                          </div>
-                        );
-                      })}
-                      {(job.assignedTeam || []).length === 0 && <span className="text-[10px] italic">No team assigned</span>}
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-bold text-lg">
+                        {job.items?.[0]?.description ? `${job.items[0].description}${job.items.length > 1 ? ` (+${job.items.length - 1} more)` : ''} - ` : ''}
+                        {job.clientName}
+                      </h3>
+                      {getStatusBadge(job.status)}
                     </div>
-                    {(job.assignedTeam || []).length > 0 && (
-                      <span className="text-[10px] font-medium text-blue-400">
-                        {(job.assignedTeam || []).map((id: string) => {
-                          const m = teamMembers.find(tm => tm.id === id);
-                          return m?.displayName || m?.email?.split('@')[0] || id;
-                        }).join(", ")}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1 font-medium">
+                        <Clock className="h-3 w-3" /> 
+                        {job.scheduledAt ? ensureDate(job.scheduledAt)?.toLocaleString() : "Unscheduled"}
                       </span>
-                    )}
-                  </div>
-                  {job.quoteNumber && (
-                    <div className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
-                      Quote reference: 
-                      {(impersonatedUser?.role || currentUserData?.role) === 'admin' ? (
-                        <Link to={`/dashboard/quotes?search=${job.quoteNumber}`} className="text-cyan-400 hover:underline font-medium">
-                          {job.quoteNumber}
-                        </Link>
-                      ) : (
-                        <span className="font-medium">{job.quoteNumber}</span>
+                      {job.clientPhone && (
+                        <span className="flex items-center gap-1 border-l border-white/10 pl-4">
+                          <Phone className="h-3 w-3 text-cyan-400" />
+                          {formatPhoneNumber(job.clientPhone)}
+                        </span>
+                      )}
+                      {job.clientAddress && (
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.clientAddress)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 border-l border-white/10 pl-4 hover:text-cyan-400 transition-colors"
+                        >
+                          <MapPin className="h-3 w-3 text-cyan-400" />
+                          {job.clientAddress}
+                        </a>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-                  <div className="flex items-center gap-6">
-                {isManagerOrAdmin && (
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-white">
-                      ${job.total?.toLocaleString() || "0.00"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {job.items?.length || 0} items
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground mt-2">
+                      <div className="flex -space-x-2 mr-2">
+                        {(job.assignedTeam || []).map((memberId: string) => {
+                          const member = teamMembers.find(m => m.id === memberId);
+                          return (
+                            <div 
+                              key={memberId} 
+                              title={member?.displayName || member?.email || memberId}
+                              className="h-6 w-6 rounded-full border-2 border-black bg-white/10 flex items-center justify-center overflow-hidden"
+                            >
+                              {member?.photoURL ? (
+                                <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                              ) : (
+                                <UserIcon className="h-3 w-3" />
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(job.assignedTeam || []).length === 0 && <span className="text-[10px] italic">No team assigned</span>}
+                      </div>
+                      {(job.assignedTeam || []).length > 0 && (
+                        <span className="text-[10px] font-medium text-blue-400">
+                          {(job.assignedTeam || []).map((id: string) => {
+                            const m = teamMembers.find(m => m.id === id);
+                            return m?.displayName || m?.email?.split('@')[0] || id;
+                          }).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    {job.quoteNumber && (
+                      <div className="mt-1 text-[10px] text-muted-foreground flex items-center gap-1">
+                        Quote reference: 
+                        {(impersonatedUser?.role || currentUserData?.role) === 'admin' ? (
+                          <Link to={`/dashboard/quotes?search=${job.quoteNumber}`} className="text-cyan-400 hover:underline font-medium">
+                            {job.quoteNumber}
+                          </Link>
+                        ) : (
+                          <span className="font-medium">{job.quoteNumber}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="h-8 w-px bg-white/5 mx-2" />
-                <div className="flex items-center gap-2">
-                  {job.status !== 'completed' && canCreateInvoice && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-xs gap-1 hover:text-emerald-500"
-                      onClick={() => convertToInvoice(job)}
-                      disabled={isConverting === job.id}
-                    >
-                      <FileText className="h-3 w-3" />
-                      {isConverting === job.id ? "Processing..." : "Invoice & Complete Job"}
-                    </Button>
+                </div>
+                    <div className="flex items-center gap-6">
+                  {isManagerOrAdmin && (
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-white">
+                        ${job.total?.toLocaleString() || "0.00"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {job.items?.length || 0} items
+                      </p>
+                    </div>
                   )}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => setViewingMediaJob(job)}
-                  >
-                    <ImageIcon className="h-5 w-5" />
-                  </Button>
-                  {canEditJob && (
+                  <div className="h-8 w-px bg-white/5 mx-2" />
+                  <div className="flex items-center gap-2">
+                    {job.status !== 'completed' && canCreateInvoice && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs gap-1 hover:text-emerald-500"
+                        onClick={() => convertToInvoice(job)}
+                        disabled={isConverting === job.id}
+                      >
+                        <FileText className="h-3 w-3" />
+                        {isConverting === job.id ? "Processing..." : "Invoice & Complete Job"}
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => setEditingJob(job)}
+                      onClick={() => setViewingMediaJob(job)}
                     >
-                      <ArrowUpRight className="h-5 w-5" />
+                      <ImageIcon className="h-5 w-5" />
                     </Button>
-                  )}
-                  {isManagerOrAdmin && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(job.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                    {canEditJob && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-white"
+                        onClick={() => setEditingJob(job)}
+                      >
+                        <ArrowUpRight className="h-5 w-5" />
+                      </Button>
+                    )}
+                    {isManagerOrAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(job.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="glass rounded-3xl border-white/5 overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="border-b border-white/5 bg-white/5">
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Job Details</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Team</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Date</th>
+                       {isManagerOrAdmin && <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Amount</th>}
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Status</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-white/5">
+                     {filteredJobs.map((job) => (
+                       <tr key={job.id} className="hover:bg-white/5 transition-colors group">
+                         <td className="p-4">
+                           <div className="font-bold text-sm">
+                             {job.items?.[0]?.description ? `${job.items[0].description}${job.items.length > 1 ? ` (+${job.items.length - 1} more)` : ''} - ` : ''}
+                             {job.clientName}
+                           </div>
+                           <div className="text-xs text-muted-foreground">{job.quoteNumber ? `Ref: ${job.quoteNumber}` : ''}</div>
+                         </td>
+                         <td className="p-4">
+                           <div className="flex -space-x-2">
+                             {(job.assignedTeam || []).map((memberId: string) => {
+                               const member = teamMembers.find(m => m.id === memberId);
+                               return (
+                                 <div 
+                                   key={memberId} 
+                                   title={member?.displayName || member?.email || memberId}
+                                   className="h-6 w-6 rounded-full border-2 border-black bg-white/10 flex items-center justify-center overflow-hidden"
+                                 >
+                                   {member?.photoURL ? (
+                                     <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+                                   ) : (
+                                     <UserIcon className="h-3 w-3" />
+                                   )}
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         </td>
+                         <td className="p-4 hidden md:table-cell">
+                           <div className="text-sm">
+                             {job.scheduledAt ? ensureDate(job.scheduledAt)?.toLocaleString() : "Unscheduled"}
+                           </div>
+                         </td>
+                         {isManagerOrAdmin && (
+                           <td className="p-4">
+                             <div className="font-bold">${job.total?.toLocaleString() || "0.00"}</div>
+                           </td>
+                         )}
+                         <td className="p-4">
+                           {getStatusBadge(job.status)}
+                         </td>
+                         <td className="p-4 text-right">
+                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {job.status !== 'completed' && canCreateInvoice && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-xs gap-1 hover:text-emerald-500 h-8"
+                                  onClick={() => convertToInvoice(job)}
+                                  disabled={isConverting === job.id}
+                                >
+                                  <FileText className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-muted-foreground hover:text-white h-8 w-8"
+                                onClick={() => setViewingMediaJob(job)}
+                              >
+                                <ImageIcon className="h-4 w-4" />
+                              </Button>
+                              {canEditJob && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-white h-8 w-8"
+                                  onClick={() => setEditingJob(job)}
+                                >
+                                  <ArrowUpRight className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {isManagerOrAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-destructive h-8 w-8"
+                                  onClick={() => handleDelete(job.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
             </div>
-          ))
+          )
         )}
       </div>
     </div>

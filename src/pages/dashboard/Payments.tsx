@@ -54,6 +54,7 @@ const Payments = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -159,6 +160,22 @@ const Payments = () => {
             className="pl-9 bg-white/5 border-white/10"
           />
         </div>
+        <div className="flex items-center gap-1 bg-white/5 p-1 border border-white/10 rounded-xl">
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('grid')}
+            variant="ghost"
+          >
+            Grid
+          </Button>
+          <Button 
+            className={`h-8 px-3 rounded-lg text-xs ${viewMode === 'list' ? 'bg-white/10 text-white' : 'bg-transparent text-muted-foreground hover:text-white'}`}
+            onClick={() => setViewMode('list')}
+            variant="ghost"
+          >
+            List
+          </Button>
+        </div>
       </div>
 
       <Dialog open={!!editingPayment} onOpenChange={(open) => !open && setEditingPayment(null)}>
@@ -184,63 +201,134 @@ const Payments = () => {
         ) : filteredPayments.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground glass rounded-2xl border-white/5">No payments recorded yet.</div>
         ) : (
-          filteredPayments.map((payment) => (
-            <div key={payment.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
-              <div className="flex items-center gap-6">
-                <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                  <CreditCard className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-lg">{payment.clientName}</h3>
-                    <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Success</Badge>
+          viewMode === 'grid' ? (
+            filteredPayments.map((payment) => (
+              <div key={payment.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+                <div className="flex items-center gap-6">
+                  <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+                    <CreditCard className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      Invoice 
-                      <Link to={`/dashboard/invoices?search=${payment.invoiceNumber}`} className="text-blue-400 hover:underline">
-                        #{payment.invoiceNumber}
-                      </Link>
-                    </span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {payment.createdAt?.toDate().toLocaleDateString()}</span>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-bold text-lg">{payment.clientName}</h3>
+                      <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Success</Badge>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        Invoice 
+                        <Link to={`/dashboard/invoices?search=${payment.invoiceNumber}`} className="text-blue-400 hover:underline">
+                          #{payment.invoiceNumber}
+                        </Link>
+                      </span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {payment.createdAt?.toDate().toLocaleDateString()}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-8">
-                <div className="text-right">
-                  <p className="text-lg font-bold text-white">
-                    +${payment.amount?.toLocaleString() || "0.00"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    via {payment.method || 'Credit Card'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-muted-foreground hover:text-white"
-                    onClick={() => setEditingPayment(payment)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                    <ArrowUpRight className="h-5 w-5" />
-                  </Button>
-                  {isManagerOrAdmin && (
+                <div className="flex items-center gap-8">
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-white">
+                      +${payment.amount?.toLocaleString() || "0.00"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      via {payment.method || 'Credit Card'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(payment.id)}
+                      className="text-muted-foreground hover:text-white"
+                      onClick={() => setEditingPayment(payment)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Edit2 className="h-4 w-4" />
                     </Button>
-                  )}
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                      <ArrowUpRight className="h-5 w-5" />
+                    </Button>
+                    {isManagerOrAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(payment.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="glass rounded-3xl border-white/5 overflow-hidden">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left border-collapse">
+                   <thead>
+                     <tr className="border-b border-white/5 bg-white/5">
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Client</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Invoice</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Date</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Amount</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Method</th>
+                       <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-white/5">
+                     {filteredPayments.map((payment) => (
+                       <tr key={payment.id} className="hover:bg-white/5 transition-colors group">
+                         <td className="p-4">
+                           <div className="font-bold text-sm">{payment.clientName}</div>
+                         </td>
+                         <td className="p-4">
+                           <div className="text-sm">
+                             <Link to={`/dashboard/invoices?search=${payment.invoiceNumber}`} className="text-blue-400 hover:underline">
+                               #{payment.invoiceNumber}
+                             </Link>
+                           </div>
+                         </td>
+                         <td className="p-4 hidden md:table-cell">
+                           <div className="text-sm">
+                             {payment.createdAt?.toDate().toLocaleDateString()}
+                           </div>
+                         </td>
+                         <td className="p-4">
+                           <div className="font-bold text-emerald-500">+${payment.amount?.toLocaleString() || "0.00"}</div>
+                         </td>
+                         <td className="p-4">
+                           <div className="text-xs text-muted-foreground">{payment.method || 'Credit Card'}</div>
+                         </td>
+                         <td className="p-4 text-right">
+                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-muted-foreground hover:text-white h-8 w-8"
+                                onClick={() => setEditingPayment(payment)}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white h-8 w-8">
+                                <ArrowUpRight className="h-4 w-4" />
+                              </Button>
+                              {isManagerOrAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-muted-foreground hover:text-destructive h-8 w-8"
+                                  onClick={() => handleDelete(payment.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                           </div>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               </div>
             </div>
-          ))
+          )
         )}
       </div>
     </div>
