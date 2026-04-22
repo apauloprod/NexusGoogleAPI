@@ -49,17 +49,19 @@ const Invoices = () => {
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
   
-  const permissions = currentUserData?.permissions || {};
-  const canViewInvoice = isAdmin || isManager || permissions.viewInvoices;
-  const canCreateInvoice = isAdmin || isManager || permissions.canCreateInvoice;
-  const canEditInvoice = isAdmin || isManager || permissions.canEditInvoice;
-  const canSendInvoice = isAdmin || isManager || permissions.canSendInvoice;
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isAdmin || isManager || permissions.page_invoices;
+  
+  const canViewInvoice = hasAccess;
+  const canCreateInvoice = hasAccess;
+  const canEditInvoice = hasAccess;
+  const canSendInvoice = hasAccess;
 
   useEffect(() => {
-    if (!isManagerOrAdmin && !canViewInvoice && !canCreateInvoice && !canEditInvoice && !canSendInvoice) {
+    if (!isAdmin && !isManager && !hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, canViewInvoice, canCreateInvoice, canEditInvoice, canSendInvoice, navigate]);
+  }, [isAdmin, isManager, hasAccess, navigate]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

@@ -39,16 +39,18 @@ const Clients = () => {
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
 
-  const permissions = currentUserData?.permissions || {};
-  const canViewClient = isAdmin || isManager || permissions.viewClients;
-  const canCreateClient = isAdmin || isManager || permissions.canCreateClient;
-  const canEditClient = isAdmin || isManager || permissions.canEditClient;
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isAdmin || isManager || permissions.page_clients;
+  
+  const canViewClient = hasAccess;
+  const canCreateClient = hasAccess;
+  const canEditClient = hasAccess;
 
   useEffect(() => {
-    if (!isManagerOrAdmin && !canViewClient && !canCreateClient && !canEditClient) {
+    if (!isAdmin && !isManager && !hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, canViewClient, canCreateClient, canEditClient, navigate]);
+  }, [isAdmin, isManager, hasAccess, navigate]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");

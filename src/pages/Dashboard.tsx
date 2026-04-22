@@ -310,12 +310,14 @@ const Sidebar = ({
             active={location.pathname === "/dashboard/admin"} 
           />
         )}
-        <SidebarItem 
-          icon={Clock} 
-          label="Timesheets" 
-          to="/dashboard/timesheets" 
-          active={location.pathname === "/dashboard/timesheets"} 
-        />
+        {(userRole === 'admin' || userRole === 'manager' || userRole === 'super-admin' || currentUserData?.permissions?.page_timesheets) && (
+          <SidebarItem 
+            icon={Clock} 
+            label="Timesheets" 
+            to="/dashboard/timesheets" 
+            active={location.pathname === "/dashboard/timesheets"} 
+          />
+        )}
         {(userRole === 'admin' || userRole === 'manager' || userRole === 'super-admin') && (
           <SidebarItem 
             icon={Users} 
@@ -488,34 +490,39 @@ export default function Dashboard() {
   }, [user, currentUserData, impersonatedUser]);
 
   const menuItems = useMemo(() => {
+    const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+    const isAdminOrManager = userRole === "admin" || userRole === "manager" || userRole === "super-admin";
+
     const baseItems = [
       { icon: LayoutDashboard, label: "Home", to: "/dashboard" },
-      { icon: Calendar, label: "Schedule", to: "/dashboard/schedule" },
-      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" },
-      { icon: MessageSquare, label: "Messages", to: "/dashboard/messages" },
+      { icon: Calendar, label: "Schedule", to: "/dashboard/schedule", permission: 'page_schedule' },
+      { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs", permission: 'page_jobs' },
+      { icon: MessageSquare, label: "Messages", to: "/dashboard/messages", permission: 'page_messages' },
     ];
 
-    if (userRole === "admin" || userRole === "manager" || userRole === "super-admin") {
-      return [
-        ...baseItems,
-        { icon: Users, label: "Clients", to: "/dashboard/clients" },
-        { icon: FileText, label: "Requests", to: "/dashboard/requests" },
-        { icon: FileText, label: "Quotes", to: "/dashboard/quotes" },
-        { icon: CheckSquare, label: "Jobs", to: "/dashboard/jobs" }, // Moved here for admins to follow flow
-        { icon: FileText, label: "Invoices", to: "/dashboard/invoices" },
-        { icon: CreditCard, label: "Payments", to: "/dashboard/payments" },
-        { icon: DollarSign, label: "Expenses", to: "/dashboard/expenses" },
-        { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing" },
-      ].filter((item, index, self) => 
-        // Remove duplicate Jobs if it's already in baseItems (or we move it entirely)
-        index === self.findIndex((t) => (
-          t.to === item.to
-        ))
+    const adminItems = [
+      { icon: Users, label: "Clients", to: "/dashboard/clients", permission: 'page_clients' },
+      { icon: FileText, label: "Requests", to: "/dashboard/requests", permission: 'page_requests' },
+      { icon: FileText, label: "Quotes", to: "/dashboard/quotes", permission: 'page_quotes' },
+      { icon: FileText, label: "Invoices", to: "/dashboard/invoices", permission: 'page_invoices' },
+      { icon: CreditCard, label: "Payments", to: "/dashboard/payments", permission: 'page_payments' },
+      { icon: DollarSign, label: "Expenses", to: "/dashboard/expenses", permission: 'page_expenses' },
+      { icon: Sparkles, label: "Marketing", to: "/dashboard/marketing", permission: 'page_marketing' },
+    ];
+
+    if (isAdminOrManager) {
+      return [...baseItems, ...adminItems].filter((item, index, self) => 
+        index === self.findIndex((t) => t.to === item.to)
       );
     }
 
-    return baseItems;
-  }, [userRole]);
+    return [...baseItems, ...adminItems].filter(item => {
+      if (item.label === "Home") return true;
+      return permissions[item.permission || ""];
+    }).filter((item, index, self) => 
+      index === self.findIndex((t) => t.to === item.to)
+    );
+  }, [userRole, currentUserData?.permissions]);
 
   if (loading) {
     return (
@@ -634,7 +641,8 @@ export default function Dashboard() {
                           uid: member.id, 
                           role: member.role,
                           businessId: member.businessId || member.id,
-                          displayName: member.displayName || member.email
+                          displayName: member.displayName || member.email,
+                          permissions: member.permissions || {}
                         });
                       }
                     }

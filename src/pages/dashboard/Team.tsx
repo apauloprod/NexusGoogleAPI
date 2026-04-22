@@ -119,21 +119,17 @@ const Team = () => {
   );
 
   const permissionsList = [
-    { id: 'viewClients', label: 'View Clients' },
-    { id: 'canCreateClient', label: 'Create Client' },
-    { id: 'canEditClient', label: 'Edit Client' },
-    { id: 'viewQuotes', label: 'View Quotes' },
-    { id: 'canCreateQuote', label: 'Create Quote' },
-    { id: 'canEditQuote', label: 'Edit Quote' },
-    { id: 'canSendQuote', label: 'Send Quote' },
-    { id: 'viewInvoices', label: 'View Invoices' },
-    { id: 'canCreateInvoice', label: 'Create Invoice' },
-    { id: 'canEditInvoice', label: 'Edit Invoice' },
-    { id: 'canSendInvoice', label: 'Send Invoice' },
-    { id: 'viewJobs', label: 'View Jobs' },
-    { id: 'canCreateJob', label: 'Create Job' },
-    { id: 'canEditJob', label: 'Edit Job' },
-    { id: 'viewRequests', label: 'View Requests' },
+    { id: 'page_requests', label: 'Requests' },
+    { id: 'page_quotes', label: 'Quotes' },
+    { id: 'page_jobs', label: 'Jobs' },
+    { id: 'page_schedule', label: 'Schedule' },
+    { id: 'page_invoices', label: 'Invoices' },
+    { id: 'page_payments', label: 'Payments' },
+    { id: 'page_clients', label: 'Clients' },
+    { id: 'page_messages', label: 'Messages' },
+    { id: 'page_marketing', label: 'Marketing' },
+    { id: 'page_expenses', label: 'Expenses' },
+    { id: 'page_timesheets', label: 'Timesheets' },
   ];
 
   const togglePermission = async (memberId: string, permissionId: string, current: boolean) => {

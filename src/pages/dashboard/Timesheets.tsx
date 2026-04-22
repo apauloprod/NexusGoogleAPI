@@ -50,10 +50,13 @@ import {
 } from "@/components/ui/select";
 import { AuthContext } from "../../App";
 import { format, differenceInMinutes, addDays, parseISO } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const Timesheets = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [entries, setEntries] = useState<any[]>([]);
+  // ... rest of state
   const [userRole, setUserRole] = useState<string | null>(null);
   const [activeEntry, setActiveEntry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +87,15 @@ const Timesheets = () => {
 
   const role = (impersonatedUser?.role || currentUserData?.role || 'team') as "admin" | "manager" | "team";
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isManagerOrAdmin || permissions.page_timesheets;
+
+  useEffect(() => {
+    if (!hasAccess && currentUserData && !loading) {
+      navigate("/dashboard");
+    }
+  }, [hasAccess, navigate, currentUserData, loading]);
 
   useEffect(() => {
     if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;

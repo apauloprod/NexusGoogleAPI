@@ -59,16 +59,17 @@ import {
 import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 
 const permissionsList = [
-  { key: "canCreateQuote", label: "Create Quotes" },
-  { key: "canEditQuote", label: "Edit Quotes" },
-  { key: "canSendQuote", label: "Send Quotes" },
-  { key: "canCreateInvoice", label: "Create Invoices" },
-  { key: "canEditInvoice", label: "Edit Invoices" },
-  { key: "canSendInvoice", label: "Send Invoices" },
-  { key: "canCreateClient", label: "Create Clients" },
-  { key: "canEditClient", label: "Edit Clients" },
-  { key: "canCreateJob", label: "Create Jobs" },
-  { key: "canEditJob", label: "Edit Jobs" },
+  { key: "page_requests", label: "Requests" },
+  { key: "page_quotes", label: "Quotes" },
+  { key: "page_jobs", label: "Jobs" },
+  { key: "page_schedule", label: "Schedule" },
+  { key: "page_invoices", label: "Invoices" },
+  { key: "page_payments", label: "Payments" },
+  { key: "page_clients", label: "Clients" },
+  { key: "page_messages", label: "Messages" },
+  { key: "page_marketing", label: "Marketing" },
+  { key: "page_expenses", label: "Expenses" },
+  { key: "page_timesheets", label: "Timesheets" },
 ];
 
 const Settings = () => {
@@ -241,6 +242,12 @@ const Settings = () => {
         role: "team",
         businessId: businessId,
         hourlyRate: 25, // Default rate
+        permissions: {
+          page_schedule: true,
+          page_jobs: true,
+          page_messages: true,
+          page_timesheets: true,
+        },
         createdAt: serverTimestamp()
       });
       setNewMemberEmail("");

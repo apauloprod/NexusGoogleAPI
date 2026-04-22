@@ -52,17 +52,19 @@ const Quotes = () => {
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
   
-  const permissions = currentUserData?.permissions || {};
-  const canViewQuote = isAdmin || isManager || permissions.viewQuotes;
-  const canCreateQuote = isAdmin || isManager || permissions.canCreateQuote;
-  const canEditQuote = isAdmin || isManager || permissions.canEditQuote;
-  const canSendQuote = isAdmin || isManager || permissions.canSendQuote;
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isAdmin || isManager || permissions.page_quotes;
+  
+  const canViewQuote = hasAccess;
+  const canCreateQuote = hasAccess;
+  const canEditQuote = hasAccess;
+  const canSendQuote = hasAccess;
 
   useEffect(() => {
-    if (!isManagerOrAdmin && !canViewQuote && !canCreateQuote && !canEditQuote && !canSendQuote) {
+    if (!isAdmin && !isManager && !hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, canViewQuote, canCreateQuote, canEditQuote, canSendQuote, navigate]);
+  }, [isAdmin, isManager, hasAccess, navigate]);
 
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

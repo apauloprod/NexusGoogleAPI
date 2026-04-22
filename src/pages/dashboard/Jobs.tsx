@@ -62,17 +62,19 @@ const Jobs = () => {
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
   
-  const permissions = currentUserData?.permissions || {};
-  const canViewJob = isAdmin || isManager || permissions.viewJobs;
-  const canCreateJob = isAdmin || isManager || permissions.canCreateJob;
-  const canEditJob = isAdmin || isManager || permissions.canEditJob;
-  const canCreateInvoice = isAdmin || isManager || permissions.canCreateInvoice;
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isAdmin || isManager || permissions.page_jobs;
+  
+  const canViewJob = hasAccess;
+  const canCreateJob = hasAccess;
+  const canEditJob = hasAccess;
+  const canCreateInvoice = isAdmin || isManager || permissions.page_invoices;
 
   useEffect(() => {
-    if (!isManagerOrAdmin && !canViewJob && !canCreateJob && !canEditJob) {
+    if (!isAdmin && !isManager && !hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, canViewJob, canCreateJob, canEditJob, navigate]);
+  }, [isAdmin, isManager, hasAccess, navigate]);
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {

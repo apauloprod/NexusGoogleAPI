@@ -19,14 +19,27 @@ import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, where, Timestamp } from "firebase/firestore";
 import { AuthContext } from "../../App";
 import { format } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 const Messages = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [activeChat, setActiveChat] = useState<any>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const role = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isManagerOrAdmin || permissions.page_messages;
+
+  useEffect(() => {
+    if (!hasAccess && currentUserData) {
+      navigate("/dashboard");
+    }
+  }, [hasAccess, navigate, currentUserData]);
 
   useEffect(() => {
     if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;

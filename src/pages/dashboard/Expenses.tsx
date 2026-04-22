@@ -56,11 +56,14 @@ const Expenses = () => {
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isManagerOrAdmin || permissions.page_expenses;
+
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    if (!hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
+  }, [hasAccess, navigate]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [timesheets, setTimesheets] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);

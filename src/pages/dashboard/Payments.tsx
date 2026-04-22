@@ -40,11 +40,14 @@ const Payments = () => {
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isManagerOrAdmin || permissions.page_payments;
+
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    if (!hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
+  }, [hasAccess, navigate]);
   const success = searchParams.get("success");
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

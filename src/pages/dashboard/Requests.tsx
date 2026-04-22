@@ -51,11 +51,14 @@ const Requests = () => {
     return null;
   };
 
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isManagerOrAdmin || permissions.page_requests;
+
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    if (!hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
+  }, [hasAccess, navigate]);
 
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { AuthContext } from "../../App";
 import { useContext } from "react";
 
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addDays, subDays, addWeeks, addMonths, startOfWeek, endOfWeek } from "date-fns";
 
 const Schedule = () => {
@@ -48,6 +49,18 @@ const Schedule = () => {
     }
   }, [currentUserData?.preferredScheduleView]);
   const [scheduleData, setScheduleData] = useState<{ visits: any[], jobs: any[] }>({ visits: [], jobs: [] });
+
+  const userRole = impersonatedUser?.role || currentUserData?.role || 'team';
+  const isAdminOrManager = userRole === 'admin' || userRole === 'manager' || userRole === 'super-admin';
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+    const hasAccess = isAdminOrManager || permissions.page_schedule;
+    if (!hasAccess && !loading && currentUserData) {
+      navigate("/dashboard");
+    }
+  }, [isAdminOrManager, currentUserData, impersonatedUser, navigate, loading]);
 
   const ensureDate = (val: any) => {
     if (!val) return null;

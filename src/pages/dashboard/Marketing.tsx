@@ -31,11 +31,14 @@ const Marketing = () => {
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
+  const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
+  const hasAccess = isManagerOrAdmin || permissions.page_marketing;
+
   useEffect(() => {
-    if (!isManagerOrAdmin) {
+    if (!hasAccess) {
       navigate("/dashboard");
     }
-  }, [isManagerOrAdmin, navigate]);
+  }, [hasAccess, navigate]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<any>(null);
