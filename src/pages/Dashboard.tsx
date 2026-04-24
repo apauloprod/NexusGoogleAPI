@@ -365,6 +365,37 @@ const Sidebar = ({
   );
 };
 
+const BottomNav = ({ menuItems, location }: any) => {
+  // Select top 4 items for quick mobile access
+  const topItems = menuItems.filter((item: any) => 
+    ["Home", "Schedule", "Clients", "Jobs"].includes(item.label)
+  );
+  
+  if (topItems.length < 4) {
+    // Fallback to first 4 if labels don't match
+    topItems.push(...menuItems.slice(0, 4 - topItems.length));
+  }
+
+  return (
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-black/90 backdrop-blur-2xl border-t border-white/5 flex items-center justify-around px-4 pb-[env(safe-area-inset-bottom)] z-50">
+      {topItems.map((item: any) => {
+        const active = location.pathname === item.to;
+        const Icon = item.icon;
+        return (
+          <Link key={item.to} to={item.to} className="flex flex-col items-center gap-1 flex-1 pt-1">
+            <div className={`p-2 rounded-xl transition-all duration-300 ${active ? "bg-white text-black scale-110" : "text-muted-foreground"}`}>
+              <Icon className="h-5 w-5" />
+            </div>
+            <span className={`text-[10px] font-bold tracking-tight uppercase ${active ? "text-white" : "text-muted-foreground"}`}>
+              {item.label}
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const { user, loading, currentUserData, impersonatedUser, setImpersonatedUser } = useContext(AuthContext);
   const location = useLocation();
@@ -696,7 +727,7 @@ export default function Dashboard() {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-auto bg-[#050505]">
+        <main className="flex-1 overflow-auto bg-[#050505] pb-20 lg:pb-0">
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/requests" element={<Requests />} />
@@ -715,6 +746,7 @@ export default function Dashboard() {
             <Route path="/admin" element={<AdminControl />} />
           </Routes>
         </main>
+        <BottomNav menuItems={menuItems} location={location} />
       </div>
 
       {/* Right Panel (Contextual) */}

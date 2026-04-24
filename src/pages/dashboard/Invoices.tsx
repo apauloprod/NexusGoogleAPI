@@ -39,6 +39,12 @@ import { useContext } from "react";
 
 
 
+const ensureDate = (val: any) => {
+  if (!val) return null;
+  if (val.toDate) return val.toDate();
+  return new Date(val);
+};
+
 const Invoices = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -135,6 +141,7 @@ const Invoices = () => {
             dueDate: inv.dueDate?.toDate().toISOString() || new Date().toISOString() 
           },
           clientEmail: clientData.email,
+          layout: businessSettings?.customInvoiceLayout || 'classic',
           appUrl: window.location.origin,
         }),
       });
@@ -168,6 +175,7 @@ const Invoices = () => {
 
   const downloadInvoice = (inv: any) => {
     const doc = new jsPDF();
+    const layout = businessSettings?.customInvoiceLayout || 'classic';
     
     // Use invoice's stored business info or fall back to current settings
     const bName = inv.businessName || businessSettings?.businessName || "Your Company";
@@ -176,63 +184,132 @@ const Invoices = () => {
       ? `${businessSettings.address.street}\n${businessSettings.address.city}, ${businessSettings.address.postcode}`
       : businessSettings?.businessDetails);
 
-    // Add Logo if exists
-    if (bLogo) {
-      try {
-        doc.addImage(bLogo, 'PNG', 20, 10, 30, 30);
-      } catch (e) {
-        console.error("Error adding logo to PDF:", e);
+    if (layout === 'modern') {
+      // Modern Layout
+      doc.setFillColor(0, 0, 0);
+      doc.rect(0, 0, 210, 60, 'F');
+      
+      if (bLogo) {
+        try { doc.addImage(bLogo, 'PNG', 20, 10, 25, 25); } catch(e) {}
       }
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text("INVOICE", 190, 25, { align: "right" });
+      
+      doc.setFontSize(10);
+      doc.text(`#${inv.invoiceNumber}`, 190, 32, { align: "right" });
+      doc.text(`Due: ${ensureDate(inv.dueDate)?.toLocaleDateString()}`, 190, 38, { align: "right" });
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.text(bName, 20, 75);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (bDetails) {
+        const detailsLines = doc.splitTextToSize(bDetails, 80);
+        doc.text(detailsLines, 20, 82);
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text("BILL TO", 120, 75);
+      doc.setFont("helvetica", "normal");
+      doc.text(inv.clientName, 120, 82);
+
+      autoTable(doc, {
+        startY: 105,
+        head: [['Description', 'Amount']],
+        body: inv.items.map((it: any) => [it.description, `$${(it.price || it.unitPrice || 0).toLocaleString()}`]),
+        foot: [['Total', `$${(inv.total || 0).toLocaleString()}`]],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 0, 0] },
+        footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
+      });
+    } else if (layout === 'minimal') {
+      // Minimal Layout
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text(bName.toUpperCase(), 20, 20);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(32);
+      doc.text(`$${(inv.total || 0).toLocaleString()}`, 20, 40);
+      doc.setFontSize(10);
+      doc.text(`INVOICE #${inv.invoiceNumber}`, 20, 48);
+
+      doc.setDrawColor(240);
+      doc.line(20, 60, 190, 60);
+
+      doc.text("CLIENT", 20, 75);
+      doc.setFont("helvetica", "bold");
+      doc.text(inv.clientName, 20, 82);
+      
+      doc.setFont("helvetica", "normal");
+      doc.text("DUE DATE", 120, 75);
+      doc.setFont("helvetica", "bold");
+      doc.text(ensureDate(inv.dueDate)?.toLocaleDateString() || "N/A", 120, 82);
+
+      autoTable(doc, {
+        startY: 100,
+        head: [['ITEM', 'PRICE']],
+        body: inv.items.map((it: any) => [it.description.toUpperCase(), `$${(it.price || it.unitPrice || 0).toLocaleString()}`]),
+        theme: 'plain',
+        headStyles: { textColor: [150, 150, 150], fontStyle: 'normal' },
+        styles: { fontSize: 9 }
+      });
+    } else {
+      // Classic Layout (Original)
+      if (bLogo) {
+        try { doc.addImage(bLogo, 'PNG', 20, 10, 30, 30); } catch (e) {}
+      }
+
+      doc.setFontSize(22);
+      doc.text("INVOICE", 200, 20, { align: "right" });
+      
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(bName, 20, 45);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (bDetails) {
+        const detailsLines = doc.splitTextToSize(bDetails, 80);
+        doc.text(detailsLines, 20, 52);
+      }
+
+      doc.setFontSize(12);
+      doc.text(`Invoice Number: ${inv.invoiceNumber}`, 200, 45, { align: "right" });
+      doc.text(`Date: ${inv.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
+      
+      const dueDateStr = inv.dueDate ? (inv.dueDate.toDate ? inv.dueDate.toDate().toLocaleDateString() : new Date(inv.dueDate).toLocaleDateString()) : "N/A";
+      doc.text(`Due Date: ${dueDateStr}`, 200, 59, { align: "right" });
+      
+      doc.setDrawColor(200);
+      doc.line(20, 80, 200, 80);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Bill To:", 20, 90);
+      doc.setFont("helvetica", "normal");
+      doc.text(inv.clientName, 20, 97);
+      
+      autoTable(doc, {
+        startY: 110,
+        head: [['Description', 'Price']],
+        body: inv.items.map((item: any) => [item.description, `$${(item.price || item.unitPrice || 0).toLocaleString()}`]),
+        foot: [['Total', `$${(inv.total || inv.totalHT || 0).toLocaleString()}`]],
+        theme: 'grid',
+        headStyles: { fillColor: [0, 0, 0] },
+      });
     }
-
-    doc.setFontSize(22);
-    doc.text("INVOICE", 200, 20, { align: "right" });
-    
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(bName, 20, 45);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    if (bDetails) {
-      const detailsLines = doc.splitTextToSize(bDetails, 80);
-      doc.text(detailsLines, 20, 52);
-    }
-
-    doc.setFontSize(12);
-    doc.text(`Invoice Number: ${inv.invoiceNumber}`, 200, 45, { align: "right" });
-    doc.text(`Date: ${inv.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
-    
-    const dueDateStr = inv.dueDate ? (inv.dueDate.toDate ? inv.dueDate.toDate().toLocaleDateString() : new Date(inv.dueDate).toLocaleDateString()) : "N/A";
-    doc.text(`Due Date: ${dueDateStr}`, 200, 59, { align: "right" });
-    
-    doc.setDrawColor(200);
-    doc.line(20, 80, 200, 80);
-
-    doc.setFont("helvetica", "bold");
-    doc.text("Bill To:", 20, 90);
-    doc.setFont("helvetica", "normal");
-    doc.text(inv.clientName, 20, 97);
-    
-    const tableData = inv.items.map((item: any) => [
-      item.description,
-      `$${(item.price || item.unitPrice || 0).toLocaleString()}`
-    ]);
-    
-    autoTable(doc, {
-      startY: 110,
-      head: [['Description', 'Price']],
-      body: tableData,
-      foot: [['Total', `$${(inv.total || inv.totalHT || 0).toLocaleString()}`]],
-      theme: 'grid',
-      headStyles: { fillColor: [0, 0, 0] },
-    });
     
     if (inv.notes) {
       const finalY = (doc as any).lastAutoTable?.finalY || 110;
-      doc.text("Notes:", 20, finalY + 20);
       doc.setFontSize(10);
-      doc.text(inv.notes, 20, finalY + 28, { maxWidth: 170 });
+      doc.setFont("helvetica", "bold");
+      doc.text("Notes:", 20, finalY + 15);
+      doc.setFont("helvetica", "normal");
+      doc.text(inv.notes, 20, finalY + 22, { maxWidth: 170 });
     }
 
     doc.save(`Invoice_${inv.invoiceNumber}.pdf`);

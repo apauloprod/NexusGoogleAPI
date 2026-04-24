@@ -11,6 +11,7 @@ import Stripe from "stripe";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import fs from "fs";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 
@@ -131,9 +132,127 @@ async function startServer() {
     res.json({ status: "alive", method: "GET", path: "/api/send-invoice", message: "Use POST to send invoices." });
   });
 
+  // Helper for PDF generation server-side
+  const generatePDFDocument = (type: 'INVOICE' | 'QUOTE', data: any, layout: string = 'classic') => {
+    const doc = new jsPDF();
+    const { businessName, businessLogo, businessDetails, items, total, notes } = data;
+    const number = type === 'INVOICE' ? data.invoiceNumber : data.quoteNumber;
+    const date = new Date().toLocaleDateString();
+    
+    if (layout === 'modern') {
+      doc.setFillColor(0, 0, 0);
+      doc.rect(0, 0, 210, 60, 'F');
+      if (businessLogo) {
+        try { doc.addImage(businessLogo, 'PNG', 20, 10, 25, 25); } catch(e) {}
+      }
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text(type, 190, 25, { align: "right" });
+      doc.setFontSize(10);
+      doc.text(`#${number}`, 190, 32, { align: "right" });
+      doc.text(`Date: ${date}`, 190, 38, { align: "right" });
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.text(businessName || "Your Company", 20, 75);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (businessDetails) {
+        const detailsLines = doc.splitTextToSize(businessDetails, 80);
+        doc.text(detailsLines, 20, 82);
+      }
+      doc.setFont("helvetica", "bold");
+      doc.text("TO CLIENT", 120, 75);
+      doc.setFont("helvetica", "normal");
+      doc.text(data.clientName, 120, 82);
+
+      autoTable(doc, {
+        startY: 105,
+        head: [['Description', 'Amount']],
+        body: (items || []).map((it: any) => [it.description, `$${(it.price || it.unitPrice || 0).toLocaleString()}`]),
+        foot: [['Total', `$${(total || 0).toLocaleString()}`]],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 0, 0] },
+        footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
+      });
+    } else if (layout === 'minimal') {
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text((businessName || "Your Company").toUpperCase(), 20, 20);
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(32);
+      doc.text(`$${(total || 0).toLocaleString()}`, 20, 40);
+      doc.setFontSize(10);
+      doc.text(`${type} #${number}`, 20, 48);
+      doc.setDrawColor(240);
+      doc.line(20, 60, 190, 60);
+      doc.text("CLIENT", 20, 75);
+      doc.setFont("helvetica", "bold");
+      doc.text(data.clientName, 20, 82);
+      doc.setFont("helvetica", "normal");
+      doc.text("DATE", 120, 75);
+      doc.setFont("helvetica", "bold");
+      doc.text(date, 120, 82);
+
+      autoTable(doc, {
+        startY: 100,
+        head: [['ITEM', 'PRICE']],
+        body: (items || []).map((it: any) => [(it.description || 'Service').toUpperCase(), `$${(it.price || it.unitPrice || 0).toLocaleString()}`]),
+        theme: 'plain',
+        headStyles: { textColor: [150, 150, 150], fontStyle: 'normal' },
+        styles: { fontSize: 9 }
+      });
+    } else {
+      // Classic
+      if (businessLogo) {
+        try { doc.addImage(businessLogo, 'PNG', 20, 10, 30, 30); } catch (e) {}
+      }
+      doc.setFontSize(22);
+      doc.text(type, 200, 20, { align: "right" });
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(businessName || "Service Provider", 20, 45);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (businessDetails) {
+        const detailsLines = doc.splitTextToSize(businessDetails, 80);
+        doc.text(detailsLines, 20, 52);
+      }
+      doc.setFontSize(12);
+      doc.text(`${type === 'INVOICE' ? 'Invoice' : 'Quote'} Number: ${number}`, 200, 45, { align: "right" });
+      doc.text(`Date: ${date}`, 200, 52, { align: "right" });
+      doc.setDrawColor(200);
+      doc.line(20, 80, 200, 80);
+      doc.setFont("helvetica", "bold");
+      doc.text("Bill To:", 20, 90);
+      doc.setFont("helvetica", "normal");
+      doc.text(data.clientName, 20, 97);
+      autoTable(doc, {
+        startY: 110,
+        head: [['Description', 'Price']],
+        body: (items || []).map((item: any) => [item.description, `$${(item.price || item.unitPrice || 0).toLocaleString()}`]),
+        foot: [['Total', `$${(total || 0).toLocaleString()}`]],
+        theme: 'grid',
+        headStyles: { fillColor: [0, 0, 0] },
+      });
+    }
+
+    if (notes) {
+      const finalY = (doc as any).lastAutoTable?.finalY || 110;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Notes:", 20, finalY + 15);
+      doc.setFont("helvetica", "normal");
+      doc.text(notes, 20, finalY + 22, { maxWidth: 170 });
+    }
+
+    return doc.output("datauristring").split(",")[1];
+  };
+
   app.post("/api/send-quote", async (req, res) => {
     console.log("Received request to send quote email:", req.body?.quote?.quoteNumber);
-    const { quote, clientEmail, appUrl } = req.body;
+    const { quote, clientEmail, appUrl, layout = 'classic' } = req.body;
     const { businessName, businessDetails, businessLogo } = quote;
 
     if (!resend) {
@@ -142,67 +261,7 @@ async function startServer() {
 
     try {
       // 1. Generate PDF
-      const doc = new jsPDF();
-      
-      // Add Logo if exists
-      if (businessLogo) {
-        try {
-          // Note: for production, you might want to fetch and convert to base64 first
-          // but jsPDF addImage supports URLs in many environments if they are accessible
-          doc.addImage(businessLogo, 'PNG', 20, 10, 30, 30);
-        } catch (e) {
-          console.error("Error adding logo to PDF:", e);
-        }
-      }
-
-      doc.setFontSize(22);
-      doc.text("SERVICE QUOTE", 200, 20, { align: "right" });
-      
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(businessName || "Service Provider", 20, 45);
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      if (businessDetails) {
-        const detailsLines = doc.splitTextToSize(businessDetails, 80);
-        doc.text(detailsLines, 20, 52);
-      }
-
-      doc.setFontSize(12);
-      doc.text(`Quote Number: ${quote.quoteNumber}`, 200, 45, { align: "right" });
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
-      
-      doc.setDrawColor(200);
-      doc.line(20, 80, 200, 80);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Bill To:", 20, 90);
-      doc.setFont("helvetica", "normal");
-      doc.text(quote.clientName, 20, 97);
-      
-      const tableData = quote.items.map((item: any) => [
-        item.description,
-        `$${(item.price || item.unitPrice || 0).toLocaleString()}`
-      ]);
-      
-      autoTable(doc, {
-        startY: 110,
-        head: [['Description', 'Price']],
-        body: tableData,
-        foot: [['Total', `$${(quote.total || quote.totalHT || 0).toLocaleString()}`]],
-        theme: 'grid',
-        headStyles: { fillColor: [0, 0, 0] },
-      });
-      
-      if (quote.notes) {
-        const finalY = (doc as any).lastAutoTable?.finalY || 110;
-        doc.text("Notes:", 20, finalY + 20);
-        doc.setFontSize(10);
-        doc.text(quote.notes, 20, finalY + 28, { maxWidth: 170 });
-      }
-
-      const pdfBase64 = doc.output("datauristring").split(",")[1];
+      const pdfBase64 = generatePDFDocument('QUOTE', quote, layout);
 
       // 2. Send Email
       const approvalUrl = `${appUrl}/#/quote/${quote.id}/approve`;
@@ -255,7 +314,7 @@ async function startServer() {
   });
 
   app.post("/api/send-invoice", async (req, res) => {
-    const { invoice, clientEmail, appUrl } = req.body;
+    const { invoice, clientEmail, appUrl, layout = 'classic' } = req.body;
     const { businessName, businessDetails, businessLogo } = invoice;
     console.log(`[INVOICE API] Request received for Invoice #${invoice?.invoiceNumber} to ${clientEmail}`);
     
@@ -267,73 +326,13 @@ async function startServer() {
     try {
       // 1. Generate PDF
       console.log("[INVOICE API] Generating PDF...");
-      const doc = new jsPDF();
-      
-      // Add Logo if exists
-      if (businessLogo) {
-        try {
-          doc.addImage(businessLogo, 'PNG', 20, 10, 30, 30);
-        } catch (e) {
-          console.error("Error adding logo to PDF:", e);
-        }
-      }
-
-      doc.setFontSize(22);
-      doc.text("INVOICE", 200, 20, { align: "right" });
-      
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text(businessName || "Service Provider", 20, 45);
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      if (businessDetails) {
-        const detailsLines = doc.splitTextToSize(businessDetails, 80);
-        doc.text(detailsLines, 20, 52);
-      }
-
-      doc.setFontSize(12);
-      doc.text(`Invoice Number: ${invoice.invoiceNumber}`, 200, 45, { align: "right" });
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
-      
-      const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "N/A";
-      doc.text(`Due Date: ${dueDateStr}`, 200, 59, { align: "right" });
-      
-      doc.setDrawColor(200);
-      doc.line(20, 80, 200, 80);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Bill To:", 20, 90);
-      doc.setFont("helvetica", "normal");
-      doc.text(invoice.clientName, 20, 97);
-      
-      const tableData = (invoice.items || []).map((item: any) => [
-        item.description || "Service",
-        `$${(Number(item.price) || Number(item.unitPrice) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-      ]);
-      
-      autoTable(doc, {
-        startY: 110,
-        head: [['Description', 'Price']],
-        body: tableData,
-        foot: [['Total', `$${(Number(invoice.total) || Number(invoice.totalHT) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`]],
-        theme: 'grid',
-        headStyles: { fillColor: [0, 0, 0] },
-      });
-      
-      if (invoice.notes) {
-        const finalY = (doc as any).lastAutoTable?.finalY || 110;
-        doc.text("Notes:", 20, finalY + 20);
-        doc.setFontSize(10);
-        doc.text(invoice.notes, 20, finalY + 28, { maxWidth: 170 });
-      }
-
-      const pdfBase64 = doc.output("datauristring").split(",")[1];
+      const pdfBase64 = generatePDFDocument('INVOICE', invoice, layout);
       console.log("[INVOICE API] PDF generated successfully");
 
       // 2. Send Email
       console.log("[INVOICE API] Sending email via Resend...");
       const paymentUrl = `${appUrl}/#/pay?type=invoice&id=${invoice.id}`;
+      const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "N/A";
       
       const { data, error } = await resend.emails.send({
         from: "CRM <onboarding@resend.dev>",
@@ -417,6 +416,60 @@ async function startServer() {
       res.json({ id: session.id, url: session.url });
     } catch (err: any) {
       console.error("Stripe Session Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // AI Business Analysis Endpoint
+  app.post("/api/ai/analyze", async (req, res) => {
+    const { prompt } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      console.error("[AI ERROR] GEMINI_API_KEY is missing from environment");
+      return res.status(500).json({ error: "Gemini API key not configured on server. Contact support." });
+    }
+
+    console.log(`[AI DEBUG] Analyze: Key Prefix: ${apiKey.substring(0, 4)}... Length: ${apiKey.length}`);
+
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      res.json({ text: response.text() });
+    } catch (err: any) {
+      console.error("[AI ERROR] Business Analysis failed:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // AI Marketing Montage Endpoint
+  app.post("/api/ai/generate-montage", async (req, res) => {
+    const { prompt } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      console.error("[AI ERROR] GEMINI_API_KEY is missing from environment");
+      return res.status(500).json({ error: "Gemini API key not configured on server. Contact support." });
+    }
+
+    console.log(`[AI DEBUG] Montage: Key Prefix: ${apiKey.substring(0, 4)}... Length: ${apiKey.length}`);
+
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      
+      // Clean result text to ensure it's valid JSON
+      const text = response.text().replace(/```json|```/g, '').trim();
+      res.json({ plan: JSON.parse(text) });
+    } catch (err: any) {
+      console.error("[AI ERROR] Montage Generation failed:", err);
       res.status(500).json({ error: err.message });
     }
   });

@@ -20,7 +20,9 @@ import {
   Plus,
   Clock,
   UserCircle,
-  CreditCard
+  CreditCard,
+  Layout,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +59,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import { toast } from "sonner";
 import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 
 const permissionsList = [
@@ -71,6 +74,7 @@ const permissionsList = [
   { key: "page_marketing", label: "Marketing" },
   { key: "page_expenses", label: "Expenses" },
   { key: "page_timesheets", label: "Timesheets" },
+  { key: "can_self_assign", label: "Can Self-Assign Jobs" },
 ];
 
 const Settings = () => {
@@ -92,6 +96,10 @@ const Settings = () => {
     hourlyRate: 0,
     jobVisibility: "all" as "all" | "own",
     allowTeamSelfAssign: false,
+    customInvoiceLayout: "classic" as "classic" | "modern" | "minimal",
+    customQuoteLayout: "classic" as "classic" | "modern" | "minimal",
+    stripePublicKey: "",
+    stripeSecretKey: "",
     address: {
       street: "",
       city: "",
@@ -122,6 +130,10 @@ const Settings = () => {
           hourlyRate: data.hourlyRate || 0,
           jobVisibility: data.jobVisibility || "all",
           allowTeamSelfAssign: data.allowTeamSelfAssign || false,
+          customInvoiceLayout: data.customInvoiceLayout || "classic",
+          customQuoteLayout: data.customQuoteLayout || "classic",
+          stripePublicKey: data.stripePublicKey || "",
+          stripeSecretKey: data.stripeSecretKey || "",
           address: data.address || { street: "", city: "", state: "", zip: "" }
         });
       }
@@ -227,7 +239,7 @@ const Settings = () => {
         ...businessData,
         updatedAt: serverTimestamp()
       });
-      alert("Settings saved successfully!");
+      toast.success("Settings saved successfully!");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, "users");
     }
@@ -431,6 +443,7 @@ const Settings = () => {
           {[
             { id: "personal", icon: UserCircle, label: "Personal Profile", staffAllowed: true },
             { id: "profile", icon: Building2, label: "Business Profile", staffAllowed: false },
+            { id: "documents", icon: FileText, label: "Invoice & Quotes", staffAllowed: false },
             { id: "integrations", icon: Globe, label: "Integrations & Ads", staffAllowed: false },
             { id: "tasks", icon: Zap, label: "Custom Tasks", staffAllowed: false },
             { id: "data", icon: Database, label: "Data & Backup", staffAllowed: false },
@@ -715,6 +728,137 @@ const Settings = () => {
                   Save Changes
                 </Button>
               )}
+            </section>
+          )}
+
+          {activeTab === "documents" && (
+            <section className="space-y-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">Invoice & Quotes Layout</h2>
+                  <p className="text-sm text-muted-foreground">Customize how your professional documents look for your clients.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8">
+                <Card className="bg-black border-white/5 rounded-[2rem] glass overflow-hidden">
+                  <CardHeader className="p-8 pb-0">
+                    <CardTitle className="text-xl">Default Invoice Layout</CardTitle>
+                    <CardDescription>Select the layout style used for generated invoice PDFs.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {[
+                        { id: 'classic', name: 'Classic', desc: 'Standard business layout with top-left logo and detailed headers.' },
+                        { id: 'modern', name: 'Modern', desc: 'Clean, asymmetrical design with bold typography and accent colors.' },
+                        { id: 'minimal', name: 'Minimal', desc: 'Ultra-clean layout focusing on the line items and total amount.' },
+                      ].map((style) => (
+                        <div 
+                          key={style.id}
+                          onClick={() => setBusinessData({...businessData, customInvoiceLayout: style.id as any})}
+                          className={`cursor-pointer rounded-2xl border transition-all p-5 space-y-4 group ${
+                            businessData.customInvoiceLayout === style.id 
+                            ? "border-cyan-500 bg-cyan-500/5 shadow-[0_0_20px_rgba(6,182,212,0.1)]" 
+                            : "border-white/10 hover:border-white/20 bg-white/5"
+                          }`}
+                        >
+                          <div className={`h-32 rounded-xl border border-white/10 overflow-hidden flex flex-col p-3 transition-colors ${
+                             businessData.customInvoiceLayout === style.id ? 'bg-cyan-950/20' : 'bg-black'
+                          }`}>
+                            <div className="flex justify-between mb-2">
+                              <div className="w-8 h-8 rounded bg-white/10" />
+                              <div className="w-12 h-2 rounded bg-white/10" />
+                            </div>
+                            <div className="space-y-1 mb-4">
+                              <div className="w-full h-1 rounded bg-white/5" />
+                              <div className="w-full h-1 rounded bg-white/5" />
+                              <div className="w-3/4 h-1 rounded bg-white/5" />
+                            </div>
+                            <div className="mt-auto flex justify-end">
+                              <div className="w-12 h-3 rounded bg-cyan-500/20" />
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className={`font-bold transition-colors ${businessData.customInvoiceLayout === style.id ? 'text-cyan-400' : 'text-white'}`}>
+                              {style.name}
+                            </h4>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed mt-1">{style.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-black border-white/5 rounded-[2rem] glass overflow-hidden">
+                  <CardHeader className="p-8 pb-0">
+                    <CardTitle className="text-xl">Default Quote Layout</CardTitle>
+                    <CardDescription>Select the layout style used for generated quote PDFs.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {[
+                        { id: 'classic', name: 'Classic', desc: 'Standard business layout with top-left logo and detailed headers.' },
+                        { id: 'modern', name: 'Modern', desc: 'Clean, asymmetrical design with bold typography and accent colors.' },
+                        { id: 'minimal', name: 'Minimal', desc: 'Ultra-clean layout focusing on the line items and total amount.' },
+                      ].map((style) => (
+                        <div 
+                          key={style.id}
+                          onClick={() => setBusinessData({...businessData, customQuoteLayout: style.id as any})}
+                          className={`cursor-pointer rounded-2xl border transition-all p-5 space-y-4 group ${
+                            businessData.customQuoteLayout === style.id 
+                            ? "border-amber-500 bg-amber-500/5 shadow-[0_0_20px_rgba(245,158,11,0.1)]" 
+                            : "border-white/10 hover:border-white/20 bg-white/5"
+                          }`}
+                        >
+                          <div className={`h-32 rounded-xl border border-white/10 overflow-hidden flex flex-col p-3 transition-colors ${
+                             businessData.customQuoteLayout === style.id ? 'bg-amber-950/20' : 'bg-black'
+                          }`}>
+                            <div className="flex justify-between mb-2">
+                              <div className="w-8 h-8 rounded bg-white/10" />
+                              <div className="w-12 h-2 rounded bg-white/10" />
+                            </div>
+                            <div className="space-y-1 mb-4">
+                              <div className="w-full h-1 rounded bg-white/5" />
+                              <div className="w-full h-1 rounded bg-white/5" />
+                              <div className="w-3/4 h-1 rounded bg-white/5" />
+                            </div>
+                            <div className="mt-auto flex justify-end">
+                              <div className="w-12 h-3 rounded bg-amber-500/20" />
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className={`font-bold transition-colors ${businessData.customQuoteLayout === style.id ? 'text-amber-400' : 'text-white'}`}>
+                              {style.name}
+                            </h4>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed mt-1">{style.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="bg-blue-500/5 border border-blue-500/20 p-6 rounded-3xl flex items-start gap-4">
+                  <Layout className="h-6 w-6 text-blue-400 mt-1" />
+                  <div>
+                    <h4 className="font-bold text-blue-400">Layout Preview Coming Soon</h4>
+                    <p className="text-xs text-muted-foreground">We are working on adding live interactive previews for each template style so you can see exactly how your info fits before saving.</p>
+                  </div>
+                </div>
+                
+                {isManagerOrAdmin && (
+                  <Button 
+                    onClick={handleSaveBusiness}
+                    className="bg-white text-black hover:bg-white/90 rounded-2xl h-14 font-bold text-lg"
+                  >
+                    Apply All Settings
+                  </Button>
+                )}
+              </div>
             </section>
           )}
 

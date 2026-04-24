@@ -99,20 +99,23 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
     
     // Role-based filtering: Team members can ONLY see themselves IF self-assign is allowed OR if they are already assigned
     if (currentRole === 'team') {
-      const isSelf = m.id === currentUserId;
-      const isAssigned = initialData?.assignedTeam?.includes(m.id);
+      const isSelf = String(m.id) === String(currentUserId);
+      const isAssigned = (initialData?.assignedTeam || []).includes(m.id);
       
-      // Global setting must be ON, and individual permission must not be explicitly FALSE
+      const individualCanSelfAssign = m.permissions?.can_self_assign === true;
       const globalSelfAssign = businessSettings?.allowTeamSelfAssign === true;
-      const individualCanSelfAssign = m.permissions?.can_self_assign !== false;
-      const canSelfAssign = isSelf ? (globalSelfAssign && individualCanSelfAssign) : false;
       
-      if (canSelfAssign || isAssigned) {
-        return matchesSearch && (isSelf || isAssigned);
+      // Can see self if they have the specific permission OR if global self-assign is on
+      const canSelfAssign = individualCanSelfAssign || globalSelfAssign;
+      
+      if (isSelf && canSelfAssign) {
+        return matchesSearch;
       }
       
-      // If not allowed to self-assign, only show who is already assigned (read-only view of team)
-      return matchesSearch && isAssigned;
+      // If they are already assigned, they should always see themselves
+      if (isAssigned) return matchesSearch;
+      
+      return false;
     }
     
     return matchesSearch;
@@ -400,6 +403,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                               type="number" 
                               placeholder="Price" 
                               {...field} 
+                              value={(field.value as any) || ""}
                               className="bg-white/5 border-white/10" 
                             />
                           </FormControl>
@@ -459,7 +463,7 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             </Badge>
           </div>
           
-          {currentRole === 'team' && businessSettings && !businessSettings?.allowTeamSelfAssign && (
+          {currentRole === 'team' && businessSettings && !businessSettings?.allowTeamSelfAssign && !(currentUserData?.permissions?.can_self_assign === true) && (
             <p className="text-[10px] text-red-400 italic font-bold">Self-assignment is currently disabled by business owner.</p>
           )}
 
@@ -486,11 +490,12 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
                     isSelected 
                       ? "bg-blue-500/20 border-blue-500/50 text-blue-400 ring-2 ring-blue-500/20" 
                       : "bg-white/5 hover:bg-white/10",
-                    !(isManagerOrAdmin || (member.id === currentUserId && businessSettings?.allowTeamSelfAssign)) && "opacity-50 cursor-not-allowed"
+                    !(isManagerOrAdmin || (String(member.id) === String(currentUserId) && (businessSettings?.allowTeamSelfAssign === true || member.permissions?.can_self_assign === true))) && "opacity-50 cursor-not-allowed"
                   )}
                   onClick={() => {
-                    const isSelf = member.id === currentUserId;
-                    const canToggle = isManagerOrAdmin || (isSelf && businessSettings?.allowTeamSelfAssign);
+                    const isSelf = String(member.id) === String(currentUserId);
+                    const canSelfAssign = (businessSettings?.allowTeamSelfAssign === true) || (member.permissions?.can_self_assign === true);
+                    const canToggle = isManagerOrAdmin || (isSelf && canSelfAssign);
                     
                     if (!canToggle) return;
 

@@ -42,6 +42,12 @@ import { useContext } from "react";
 
 
 
+const ensureDate = (val: any) => {
+  if (!val) return null;
+  if (val.toDate) return val.toDate();
+  return new Date(val);
+};
+
 const Quotes = () => {
   const { user, currentUserData, impersonatedUser } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -136,6 +142,7 @@ const Quotes = () => {
         body: JSON.stringify({
           quote: { id: quote.id, ...quote },
           clientEmail: clientData.email,
+          layout: businessSettings?.customQuoteLayout || 'classic',
           appUrl: window.location.origin,
         }),
       });
@@ -169,6 +176,7 @@ const Quotes = () => {
 
   const downloadQuote = (quote: any) => {
     const doc = new jsPDF();
+    const layout = businessSettings?.customQuoteLayout || 'classic';
     
     // Use quote's stored business info or fall back to current settings
     const bName = quote.businessName || businessSettings?.businessName || "Your Company";
@@ -177,60 +185,129 @@ const Quotes = () => {
       ? `${businessSettings.address.street}\n${businessSettings.address.city}, ${businessSettings.address.postcode}`
       : businessSettings?.businessDetails);
 
-    // Add Logo if exists
-    if (bLogo) {
-      try {
-        doc.addImage(bLogo, 'PNG', 20, 10, 30, 30);
-      } catch (e) {
-        console.error("Error adding logo to PDF:", e);
+    if (layout === 'modern') {
+      // Modern Layout
+      doc.setFillColor(0, 0, 0);
+      doc.rect(0, 0, 210, 60, 'F');
+      
+      if (bLogo) {
+        try { doc.addImage(bLogo, 'PNG', 20, 10, 25, 25); } catch(e) {}
       }
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text("QUOTE", 190, 25, { align: "right" });
+      
+      doc.setFontSize(10);
+      doc.text(`#${quote.quoteNumber}`, 190, 32, { align: "right" });
+      doc.text(`Date: ${ensureDate(quote.createdAt)?.toLocaleDateString()}`, 190, 38, { align: "right" });
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.text(bName, 20, 75);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (bDetails) {
+        const detailsLines = doc.splitTextToSize(bDetails, 80);
+        doc.text(detailsLines, 20, 82);
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text("FOR CLIENT", 120, 75);
+      doc.setFont("helvetica", "normal");
+      doc.text(quote.clientName, 120, 82);
+
+      autoTable(doc, {
+        startY: 105,
+        head: [['Service Description', 'Estimate']],
+        body: (quote.items || []).map((it: any) => [it.description, `$${(it.price || it.unitPrice || 0).toLocaleString()}`]),
+        foot: [['Total Estimate', `$${(quote.total || 0).toLocaleString()}`]],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 0, 0] },
+        footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
+      });
+    } else if (layout === 'minimal') {
+      // Minimal Layout
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text(bName.toUpperCase(), 20, 20);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(32);
+      doc.text(`$${(quote.total || 0).toLocaleString()}`, 20, 40);
+      doc.setFontSize(10);
+      doc.text(`SERVICE QUOTE #${quote.quoteNumber}`, 20, 48);
+
+      doc.setDrawColor(240);
+      doc.line(20, 60, 190, 60);
+
+      doc.text("CLIENT", 20, 75);
+      doc.setFont("helvetica", "bold");
+      doc.text(quote.clientName, 20, 82);
+      
+      doc.setFont("helvetica", "normal");
+      doc.text("ISSUE DATE", 120, 75);
+      doc.setFont("helvetica", "bold");
+      doc.text(ensureDate(quote.createdAt)?.toLocaleDateString() || "N/A", 120, 82);
+
+      autoTable(doc, {
+        startY: 100,
+        head: [['TASK', 'PRICE']],
+        body: (quote.items || []).map((it: any) => [it.description.toUpperCase(), `$${(it.price || it.unitPrice || 0).toLocaleString()}`]),
+        theme: 'plain',
+        headStyles: { textColor: [150, 150, 150], fontStyle: 'normal' },
+        styles: { fontSize: 9 }
+      });
+    } else {
+      // Classic Layout (Original)
+      if (bLogo) {
+        try { doc.addImage(bLogo, 'PNG', 20, 10, 30, 30); } catch (e) {}
+      }
+
+      doc.setFontSize(22);
+      doc.text("SERVICE QUOTE", 200, 20, { align: "right" });
+      
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text(bName, 20, 45);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      if (bDetails) {
+        const detailsLines = doc.splitTextToSize(bDetails, 80);
+        doc.text(detailsLines, 20, 52);
+      }
+
+      doc.setFontSize(12);
+      doc.text(`Quote Number: ${quote.quoteNumber}`, 200, 45, { align: "right" });
+      doc.text(`Date: ${quote.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
+      
+      doc.setDrawColor(200);
+      doc.line(20, 80, 200, 80);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Bill To:", 20, 90);
+      doc.setFont("helvetica", "normal");
+      doc.text(quote.clientName, 20, 97);
+      
+      autoTable(doc, {
+        startY: 110,
+        head: [['Description', 'Price']],
+        body: (quote.items || []).map((item: any) => [item.description, `$${(item.price || item.unitPrice || 0).toLocaleString()}`]),
+        foot: [['Total', `$${(quote.total || quote.totalTTC || 0).toLocaleString()}`]],
+        theme: 'grid',
+        headStyles: { fillColor: [0, 0, 0] },
+      });
     }
-
-    doc.setFontSize(22);
-    doc.text("SERVICE QUOTE", 200, 20, { align: "right" });
-    
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text(bName, 20, 45);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    if (bDetails) {
-      const detailsLines = doc.splitTextToSize(bDetails, 80);
-      doc.text(detailsLines, 20, 52);
-    }
-
-    doc.setFontSize(12);
-    doc.text(`Quote Number: ${quote.quoteNumber}`, 200, 45, { align: "right" });
-    doc.text(`Date: ${quote.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}`, 200, 52, { align: "right" });
-    
-    doc.setDrawColor(200);
-    doc.line(20, 80, 200, 80);
-
-    doc.setFont("helvetica", "bold");
-    doc.text("Bill To:", 20, 90);
-    doc.setFont("helvetica", "normal");
-    doc.text(quote.clientName, 20, 97);
-    
-    const tableData = (quote.items || []).map((item: any) => [
-      item.description,
-      `$${(item.price || item.unitPrice || 0).toLocaleString()}`
-    ]);
-    
-    autoTable(doc, {
-      startY: 110,
-      head: [['Description', 'Price']],
-      body: tableData,
-      foot: [['Total', `$${(quote.total || quote.totalTTC || 0).toLocaleString()}`]],
-      theme: 'grid',
-      headStyles: { fillColor: [0, 0, 0] },
-    });
     
     if (quote.notes) {
       const finalY = (doc as any).lastAutoTable?.finalY || 110;
-      doc.text("Notes:", 20, finalY + 20);
       doc.setFontSize(10);
-      doc.text(quote.notes, 20, finalY + 28, { maxWidth: 170 });
+      doc.setFont("helvetica", "bold");
+      doc.text("Notes:", 20, finalY + 15);
+      doc.setFont("helvetica", "normal");
+      doc.text(quote.notes, 20, finalY + 22, { maxWidth: 170 });
     }
 
     doc.save(`Quote_${quote.quoteNumber}.pdf`);

@@ -105,10 +105,15 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (request.resource.data.senderId == request.auth.uid || isAdmin());
     }
 
-    // Users: Admin can manage, users can read their own
+    // Users: Users can read their own, Admin/Manager can manage
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isStaff());
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isAdmin() || 
+        (isStaff() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager')
+      );
+      allow create, delete: if isAdmin();
     }
   }
 }

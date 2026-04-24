@@ -132,6 +132,20 @@ const Schedule = () => {
     });
   };
 
+  const handleItemClick = (item: any) => {
+    if (item.type === 'job') {
+      navigate(`/dashboard/jobs?search=${item.id}`);
+    } else {
+      // For visits, check if it has a quoteId
+      if (item.quoteId) {
+        navigate(`/dashboard/quotes?search=${item.quoteId}`);
+      } else {
+        // Fallback to client name search on quotes page
+        navigate(`/dashboard/quotes?search=${item.clientName || ''}`);
+      }
+    }
+  };
+
   const handlePrev = () => {
     if (viewMode === 'timeline') {
       setCurrentDate(prev => addWeeks(prev, -1));
@@ -307,7 +321,7 @@ const Schedule = () => {
                 <h2 className="text-xl font-bold border-b border-white/10 pb-2 text-emerald-400">{dateStr}</h2>
                 <div className="grid gap-4">
                   {(items as any[]).map((item) => (
-                    <div key={item.id} className="p-4 rounded-2xl glass border-white/5 flex items-center gap-4 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
+                    <div key={item.id} className="p-4 rounded-2xl glass border-white/5 flex items-center gap-4 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => handleItemClick(item)}>
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-1">
                           <h3 className="font-bold text-lg">{item.title}</h3>
@@ -371,7 +385,7 @@ const Schedule = () => {
                         dayItems.map(item => (
                           <div 
                             key={item.id} 
-                            onClick={() => setEditingItem(item)}
+                            onClick={() => handleItemClick(item)}
                             className={cn(
                               "p-5 rounded-[2rem] border transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] group relative glass",
                               item.type === 'job' 
@@ -425,7 +439,7 @@ const Schedule = () => {
           </div>
         ) : (
           filteredVisits.map((item) => (
-            <div key={item.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingItem(item)}>
+            <div key={item.id} className="p-6 rounded-2xl glass border-white/5 flex items-center gap-6 hover:border-white/10 transition-colors group cursor-pointer" onClick={() => handleItemClick(item)}>
               <div className="w-24 text-center border-r border-white/10 pr-6">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
                   {ensureDate(item.scheduledAt)?.toLocaleDateString('en-US', { weekday: 'short' })}

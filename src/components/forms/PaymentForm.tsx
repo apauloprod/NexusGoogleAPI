@@ -263,7 +263,7 @@ export function PaymentForm({ initialData, onSuccess, onCancel }: PaymentFormPro
               <FormItem>
                 <FormLabel>Payment Amount ($)</FormLabel>
                 <FormControl>
-                  <Input type="number" step="0.01" {...field} className="bg-white/5 border-white/10" />
+                  <Input type="number" step="0.01" {...field} value={(field.value as any) || ""} className="bg-white/5 border-white/10" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

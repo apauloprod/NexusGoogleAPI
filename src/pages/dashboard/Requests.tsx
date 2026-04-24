@@ -354,17 +354,17 @@ const Requests = () => {
                      <Button 
                        variant="ghost" 
                        size="sm" 
-                       className="text-xs gap-1 hover:text-emerald-500 h-10 px-4 rounded-xl"
+                       className="text-xs gap-1 hover:text-emerald-500 h-9 rounded-xl border border-white/5 bg-white/5"
                        onClick={(e) => { e.stopPropagation(); handleConvertToQuote(req); }}
                        disabled={isConverting === req.id}
                      >
-                       <FilePlus className="h-3.5 w-3.5" />
+                       <FilePlus className="h-4 w-4" />
                        {isConverting === req.id ? "Converting..." : "Convert Quote"}
                      </Button>
                      <Button 
                        variant="ghost" 
                        size="icon" 
-                       className="rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white h-10 w-10 transition-all active:scale-95 shadow-lg shadow-white/10"
+                       className="text-muted-foreground hover:text-white h-9 w-9 rounded-xl border border-white/5 bg-white/5"
                        onClick={(e) => { e.stopPropagation(); setEditingRequest(req); }}
                      >
                        <Pencil className="h-4 w-4" />
@@ -373,7 +373,7 @@ const Requests = () => {
                        <Button 
                          variant="ghost" 
                          size="icon" 
-                         className="h-10 w-10 text-muted-foreground hover:text-red-400 rounded-xl"
+                         className="text-muted-foreground hover:text-red-400 h-9 w-9 rounded-xl border border-white/5 bg-white/5"
                          onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}
                        >
                          <Trash2 className="h-4 w-4" />
@@ -422,7 +422,7 @@ const Requests = () => {
                                  <Button 
                                    variant="ghost" 
                                    size="sm" 
-                                   className="text-xs gap-1 hover:text-emerald-500 h-9 px-3 rounded-xl hover:bg-white/5 transition-all"
+                                   className="text-xs gap-1 hover:text-emerald-500"
                                    onClick={(e) => { e.stopPropagation(); handleConvertToQuote(req); }}
                                    disabled={isConverting === req.id}
                                  >
@@ -433,13 +433,13 @@ const Requests = () => {
                                <Button 
                                  variant="ghost" 
                                  size="icon" 
-                                 className="text-muted-foreground hover:text-white h-8 w-8 rounded-lg" 
+                                 className="text-muted-foreground hover:text-white" 
                                  onClick={(e) => { e.stopPropagation(); setEditingRequest(req); }}
                                >
                                  <Pencil className="h-3.5 w-3.5" />
                                </Button>
                                {isManagerOrAdmin && (
-                                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
+                                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
                                    <Trash2 className="h-4 w-4" />
                                  </Button>
                                )}

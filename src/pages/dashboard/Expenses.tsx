@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext } from "react";
+import ReactMarkdown from "react-markdown";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -12,14 +13,20 @@ import {
   BarChart as BarChartIcon,
   Calculator,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles,
+  Zap,
+  Target,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { motion } from "motion/react";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, Timestamp, where } from "firebase/firestore";
 import { 
@@ -69,7 +76,10 @@ const Expenses = () => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [includeLabor, setIncludeLabor] = useState(true);
   const [newExpense, setNewExpense] = useState({
@@ -119,6 +129,13 @@ const Expenses = () => {
       where("businessId", "==", businessId)
     ), (snap) => {
       setJobs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const unsubInvoices = onSnapshot(query(
+      collection(db, "invoices"),
+      where("businessId", "==", businessId)
+    ), (snap) => {
+      setInvoices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
 
@@ -128,6 +145,7 @@ const Expenses = () => {
       unsubQuotes();
       unsubRequests();
       unsubJobs();
+      unsubInvoices();
     };
   }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
@@ -169,6 +187,46 @@ const Expenses = () => {
   }, [expenses]);
 
   const totalSpending = (includeLabor ? totalLaborCost : 0) + totalOtherExpenses;
+
+  const totalActualRevenue = useMemo(() => {
+    return invoices
+      .filter(inv => inv.status === 'paid')
+      .reduce((sum, inv) => sum + (inv.total || 0), 0);
+  }, [invoices]);
+
+  const generateAiAdvice = async () => {
+    if (isAiLoading) return;
+    setIsAiLoading(true);
+    try {
+      const prompt = `
+        Analyze this business financial data and provide 3-4 professional strategies for scaling and optimizing profit.
+        - Actual Revenue (Paid Invoices): $${totalActualRevenue}
+        - Total Expenses (Material/Other): $${totalOtherExpenses}
+        - Total Labor Cost: $${totalLaborCost}
+        - Current Jobs: ${jobs.length}
+        - New Requests (Leads): ${requests.length}
+        - Pending Revenue (Quotes/Invoices): $${invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0) + quotes.filter(q => q.status === 'sent').reduce((s, q) => s + (q.total || 0), 0)}
+
+        Return a concise, data-driven response in markdown. Focus on scaling advice based on the lead-to-job conversion and the ratio of labor to revenue.
+      `;
+
+      const response = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to generate advice");
+      
+      setAiAdvice(data.text);
+    } catch (error: any) {
+      console.error("AI Advice Error:", error);
+      setAiAdvice(`Failed to generate AI advice: ${error.message}`);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   // Projection Data
   const projectionData = useMemo(() => {
@@ -322,19 +380,31 @@ const Expenses = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="glass p-6 rounded-3xl border-white/5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <DollarSign className="h-5 w-5 text-emerald-500" />
+            </div>
+            <span className="text-sm font-medium text-muted-foreground">Actual Revenue</span>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-3xl font-bold text-white">${totalActualRevenue.toLocaleString(undefined, { minimumFractionDigits: 0 })}</h2>
+            <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+              Paid
+            </Badge>
+          </div>
+        </div>
+
         <div className="glass p-6 rounded-3xl border-white/5">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-              <DollarSign className="h-5 w-5 text-white" />
+              <Plus className="h-5 w-5 text-white" />
             </div>
             <span className="text-sm font-medium text-muted-foreground">Total Spending</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-3xl font-bold">${totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
-            <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-              MTD
-            </Badge>
+            <h2 className="text-3xl font-bold">${totalSpending.toLocaleString(undefined, { minimumFractionDigits: 0 })}</h2>
           </div>
         </div>
 
@@ -346,24 +416,74 @@ const Expenses = () => {
             <span className="text-sm font-medium text-muted-foreground">Labor Costs</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-3xl font-bold">${totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h2>
-            <Badge variant="outline" className="text-[10px] border-white/10">Approved Only</Badge>
+            <h2 className="text-3xl font-bold">${totalLaborCost.toLocaleString(undefined, { minimumFractionDigits: 0 })}</h2>
           </div>
         </div>
 
         <div className="glass p-6 rounded-3xl border-white/5">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5 text-emerald-400" />
+              <Target className="h-5 w-5 text-amber-400" />
             </div>
-            <span className="text-sm font-medium text-muted-foreground">Projected Revenue MTD</span>
+            <span className="text-sm font-medium text-muted-foreground">Net Position</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-3xl font-bold text-emerald-400">
-              ${(projectionData[projectionData.length - 1]?.projection || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            <h2 className={cn(
+              "text-3xl font-bold",
+              totalActualRevenue - totalSpending >= 0 ? "text-emerald-400" : "text-red-400"
+            )}>
+              ${(totalActualRevenue - totalSpending).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </h2>
-            <span className="text-xs text-muted-foreground">Based on requests & active jobs</span>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-8 mb-8">
+        <div className="glass p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-blue-500/10 via-transparent to-transparent relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Sparkles className="h-32 w-32" />
+          </div>
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+                <Sparkles className="h-6 w-6 text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold tracking-tighter">AI Business Scaling Advisor</h3>
+                <p className="text-muted-foreground">Get data-driven projections and advice on how to scale your business operations.</p>
+              </div>
+            </div>
+            <Button 
+              onClick={generateAiAdvice} 
+              disabled={isAiLoading}
+              className="bg-blue-500 hover:bg-blue-600 text-white font-bold h-12 px-8 rounded-2xl gap-2"
+            >
+              {isAiLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Analyzing Data...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 fill-current" />
+                  Generate Scaling Advice
+                </>
+              )}
+            </Button>
+          </div>
+
+          {aiAdvice && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 p-6 rounded-3xl bg-white/5 border border-white/5 prose prose-invert max-w-none"
+            >
+              <div className="markdown-body">
+                <ReactMarkdown>{aiAdvice}</ReactMarkdown>
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
 
