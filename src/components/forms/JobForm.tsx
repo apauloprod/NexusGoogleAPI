@@ -1,4 +1,4 @@
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, CheckCircle2, User as UserIcon, Search } from "lucide-react";
 import { db, handleFirestoreError, OperationType, auth } from "../../firebase";
 import { collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, updateDoc, getDoc, Timestamp, onSnapshot, where } from "firebase/firestore";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { AuthContext } from "../../App";
 
@@ -79,18 +79,19 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       setCustomTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // Fetch business settings (from owner's document)
-    // Business ID is the owner's UID
-    getDoc(doc(db, "users", businessId)).then(snap => {
+    // Fetch business settings (from owner's document) - Real-time
+    const unsubBusiness = onSnapshot(doc(db, "users", businessId), (snap) => {
       if (snap.exists()) {
         setBusinessSettings(snap.data());
       }
     });
 
+    return () => unsubBusiness();
+
   }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
+  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager' || currentRole === 'super-admin';
   const currentUserId = impersonatedUser?.uid || user?.uid;
 
   const filteredTeam = availableTeam.filter(m => {
@@ -101,8 +102,12 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
       const isSelf = m.id === currentUserId;
       const isAssigned = initialData?.assignedTeam?.includes(m.id);
       
-      if (businessSettings?.allowTeamSelfAssign) {
-        // Can see themselves to toggle assignment, plus anyone already assigned to see the team
+      // Global setting must be ON, and individual permission must not be explicitly FALSE
+      const globalSelfAssign = businessSettings?.allowTeamSelfAssign === true;
+      const individualCanSelfAssign = m.permissions?.can_self_assign !== false;
+      const canSelfAssign = isSelf ? (globalSelfAssign && individualCanSelfAssign) : false;
+      
+      if (canSelfAssign || isAssigned) {
         return matchesSearch && (isSelf || isAssigned);
       }
       
@@ -134,8 +139,14 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
     name: "items",
   });
 
-  const watchItems = form.watch("items");
-  const total = watchItems?.reduce((sum, item) => sum + (Number(item.price) || 0), 0) || 0;
+  const watchItems = useWatch({
+    control: form.control,
+    name: "items",
+  });
+  
+  const total = useMemo(() => {
+    return (watchItems || []).reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
+  }, [watchItems]);
 
   async function onSubmit(values: JobFormValues) {
     if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
@@ -156,13 +167,15 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
         }
       }
       
+      const currentTotal = (values.items || []).reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
+      
       const jobData = {
         ...values,
         businessId,
         clientName,
         clientPhone,
         clientAddress,
-        total,
+        total: currentTotal,
         scheduledAt: values.scheduledAt ? Timestamp.fromDate(new Date(values.scheduledAt)) : null,
         updatedAt: serverTimestamp(),
       };
@@ -446,8 +459,8 @@ export function JobForm({ initialData, onSuccess, onCancel }: JobFormProps) {
             </Badge>
           </div>
           
-          {currentRole === 'team' && !businessSettings?.allowTeamSelfAssign && (
-            <p className="text-[10px] text-red-400 italic">Self-assignment is disabled by business owner.</p>
+          {currentRole === 'team' && businessSettings && !businessSettings?.allowTeamSelfAssign && (
+            <p className="text-[10px] text-red-400 italic font-bold">Self-assignment is currently disabled by business owner.</p>
           )}
 
           <div className="relative">

@@ -48,7 +48,7 @@ const Quotes = () => {
   const [searchParams] = useSearchParams();
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super-admin';
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
   
@@ -75,7 +75,7 @@ const Quotes = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("quoteNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(currentUserData?.preferredViewMode === 'list' ? 'list' : 'grid');
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -455,7 +455,7 @@ const Quotes = () => {
         ) : (
           viewMode === 'grid' ? (
             filteredQuotes.map((quote) => (
-              <div key={quote.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+              <div key={quote.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingQuote(quote)}>
                 <div className="flex items-center gap-6">
                   <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                     <FileText className="h-6 w-6 text-muted-foreground" />
@@ -494,7 +494,7 @@ const Quotes = () => {
                         variant="ghost" 
                         size="sm" 
                         className="text-xs gap-1 hover:text-emerald-500"
-                        onClick={() => convertToJob(quote)}
+                        onClick={(e) => { e.stopPropagation(); convertToJob(quote); }}
                       >
                         <Briefcase className="h-3 w-3" />
                         Approve & Job
@@ -505,7 +505,7 @@ const Quotes = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-white"
-                        onClick={() => sendQuoteEmail(quote)}
+                        onClick={(e) => { e.stopPropagation(); sendQuoteEmail(quote); }}
                         disabled={isSending === quote.id}
                       >
                         <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
@@ -516,7 +516,7 @@ const Quotes = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-white"
-                        onClick={() => setEditingQuote(quote)}
+                        onClick={(e) => { e.stopPropagation(); setEditingQuote(quote); }}
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -526,7 +526,7 @@ const Quotes = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(quote.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(quote.id); }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -535,7 +535,7 @@ const Quotes = () => {
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => downloadQuote(quote)}
+                      onClick={(e) => { e.stopPropagation(); downloadQuote(quote); }}
                     >
                       <Download className="h-5 w-5" />
                     </Button>
@@ -559,7 +559,7 @@ const Quotes = () => {
                    </thead>
                    <tbody className="divide-y divide-white/5">
                      {filteredQuotes.map((quote) => (
-                       <tr key={quote.id} className="hover:bg-white/5 transition-colors group">
+                       <tr key={quote.id} className="hover:bg-white/5 transition-colors cursor-pointer group" onClick={() => setEditingQuote(quote)}>
                          <td className="p-4">
                            <div className="font-bold">#{quote.quoteNumber || quote.id.slice(0, 6)}</div>
                          </td>
@@ -590,7 +590,7 @@ const Quotes = () => {
                                   variant="ghost" 
                                   size="sm" 
                                   className="text-xs gap-1 hover:text-emerald-500 h-8"
-                                  onClick={() => convertToJob(quote)}
+                                  onClick={(e) => { e.stopPropagation(); convertToJob(quote); }}
                                 >
                                   <Briefcase className="h-3 w-3" />
                                 </Button>
@@ -600,7 +600,7 @@ const Quotes = () => {
                                   variant="ghost" 
                                   size="icon" 
                                   className="text-muted-foreground hover:text-white h-8 w-8"
-                                  onClick={() => sendQuoteEmail(quote)}
+                                  onClick={(e) => { e.stopPropagation(); sendQuoteEmail(quote); }}
                                   disabled={isSending === quote.id}
                                 >
                                   <Send className={`h-4 w-4 ${isSending === quote.id ? 'animate-pulse' : ''}`} />
@@ -611,7 +611,7 @@ const Quotes = () => {
                                   variant="ghost" 
                                   size="icon" 
                                   className="text-muted-foreground hover:text-white h-8 w-8"
-                                  onClick={() => setEditingQuote(quote)}
+                                  onClick={(e) => { e.stopPropagation(); setEditingQuote(quote); }}
                                 >
                                   <Edit2 className="h-4 w-4" />
                                 </Button>
@@ -621,7 +621,7 @@ const Quotes = () => {
                                   variant="ghost" 
                                   size="icon" 
                                   className="text-muted-foreground hover:text-destructive h-8 w-8"
-                                  onClick={() => handleDelete(quote.id)}
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(quote.id); }}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -630,7 +630,7 @@ const Quotes = () => {
                                 variant="ghost" 
                                 size="icon" 
                                 className="text-muted-foreground hover:text-white h-8 w-8"
-                                onClick={() => downloadQuote(quote)}
+                                onClick={(e) => { e.stopPropagation(); downloadQuote(quote); }}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>

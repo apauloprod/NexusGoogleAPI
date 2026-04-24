@@ -141,7 +141,7 @@ const Settings = () => {
   }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super-admin';
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
 
@@ -507,6 +507,28 @@ const Settings = () => {
                         </SelectContent>
                       </Select>
                       <p className="text-[10px] text-muted-foreground mt-1">This will be your default view when you load the schedule page.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Preferred Listing View</Label>
+                      <Select 
+                        value={currentUserData?.preferredViewMode || "grid"}
+                        onValueChange={async (value) => {
+                          if (!user) return;
+                          await updateDoc(doc(db, "users", user.uid), {
+                            preferredViewMode: value
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="bg-white/5 border-white/10 rounded-xl h-11">
+                          <SelectValue placeholder="Select view" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-black border-white/10 text-white">
+                          <SelectItem value="grid">Grid (Default)</SelectItem>
+                          <SelectItem value="list">List</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground mt-1">This will be the default view for Requests, Quotes, Jobs, Invoices, and Payments.</p>
                     </div>
                   </div>
                   <div className="pt-4 border-t border-white/5 space-y-4">

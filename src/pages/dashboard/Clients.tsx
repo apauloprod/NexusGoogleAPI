@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../../App";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
   Plus, 
   Users,
@@ -35,7 +35,7 @@ const Clients = () => {
   const navigate = useNavigate();
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super-admin';
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
 
@@ -51,13 +51,14 @@ const Clients = () => {
       navigate("/dashboard");
     }
   }, [isAdmin, isManager, hasAccess, navigate]);
+  const [searchParams] = useSearchParams();
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [clientToDelete, setClientToDelete] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(currentUserData?.preferredViewMode === 'list' ? 'list' : 'grid');
 
   const handleDelete = async () => {
     if (!clientToDelete) return;

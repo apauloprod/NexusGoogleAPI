@@ -54,7 +54,7 @@ const AdminControl = () => {
       const role = userDoc.data()?.role;
       const isSuper = auth.currentUser.email === "apauloprod@gmail.com";
       
-      if (role !== "admin" || !isSuper) {
+      if (!isSuper && role !== "super-admin") {
         navigate("/dashboard");
       }
     };

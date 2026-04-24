@@ -1,4 +1,4 @@
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -147,15 +147,14 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
   }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   useEffect(() => {
-    const fetchBusinessSettings = async () => {
-      if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
-      const businessId = impersonatedUser?.businessId || currentUserData.businessId;
-      const snap = await getDoc(doc(db, "users", businessId));
+    if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;
+    const businessId = impersonatedUser?.businessId || currentUserData.businessId;
+    const unsubBusiness = onSnapshot(doc(db, "users", businessId), (snap) => {
       if (snap.exists()) {
         setBusinessSettings(snap.data());
       }
-    };
-    fetchBusinessSettings();
+    });
+    return () => unsubBusiness();
   }, [currentUserData?.businessId, impersonatedUser?.businessId]);
 
   useEffect(() => {
@@ -196,9 +195,13 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
     name: "items",
   });
 
-  const watchItems = form.watch("items");
+  const watchItems = useWatch({
+    control: form.control,
+    name: "items",
+  });
+  
   const total = useMemo(() => {
-    return (watchItems || []).reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    return (watchItems || []).reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
   }, [watchItems]);
 
   async function onSubmit(values: QuoteFormValues) {
@@ -235,13 +238,15 @@ export function QuoteForm({ initialData, onSuccess, onCancel }: QuoteFormProps) 
       let quoteId = initialData?.id;
       
       const { items, ...restValues } = values;
+      const currentTotal = (items || []).reduce((sum, item) => sum + (Number(item?.price) || 0), 0);
+      
       const quoteData = {
         ...restValues,
         items: items.map(i => ({ description: i.description, price: Number(i.price) })),
         clientId,
         businessId,
         clientName,
-        total,
+        total: currentTotal,
         requestId: initialData?.requestId || null,
         visitId: initialData?.visitId || initialData?.id || null, // If created from a visit, track it
         businessName: businessSettings?.businessName || "",

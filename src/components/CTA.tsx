@@ -1,6 +1,5 @@
 import { motion } from "motion/react";
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ContactForm } from "./ContactForm";
 
 export const CTA = () => {
   return (
@@ -8,42 +7,30 @@ export const CTA = () => {
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] bg-primary/20 blur-[150px] rounded-full -z-10" />
       
-      <div className="max-w-4xl mx-auto text-center glass p-12 md:p-20 rounded-[4rem] border-white/10">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-4xl md:text-6xl font-bold tracking-tighter mb-8 leading-[0.9]"
-        >
-          Ready to unlock your <br />
-          business's full potential?
-        </motion.h2>
-        
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }}
-          className="text-lg md:text-xl text-muted-foreground mb-12 max-w-xl mx-auto"
-        >
-          Join the elite group of companies using Nexus to drive their 
-          next phase of growth.
-        </motion.p>
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-4xl md:text-6xl font-bold tracking-tighter mb-6 leading-[0.9]"
+          >
+            Experience the <br className="hidden md:block" />
+            <span className="text-white">Nexus Advantage</span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="text-lg text-muted-foreground max-w-xl mx-auto"
+          >
+            Ready to streamline your business? Send us an inquiry below and 
+            we'll help you unlock exponential growth.
+          </motion.p>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.2 }}
-        >
-          <Button size="lg" className="bg-white text-black hover:bg-white/90 rounded-full px-10 h-16 text-xl font-bold group">
-            Get Started Today
-            <ArrowRight className="ml-2 h-6 w-6 group-hover:translate-x-1 transition-transform" />
-          </Button>
-          <p className="mt-6 text-sm text-muted-foreground">
-            No credit card required. Free consultation included.
-          </p>
-        </motion.div>
+        <ContactForm />
       </div>
 
       {/* Footer-ish info */}

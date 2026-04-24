@@ -31,7 +31,7 @@ const Messages = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager' || role === 'super-admin';
   const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
   const hasAccess = isManagerOrAdmin || permissions.page_messages;
 

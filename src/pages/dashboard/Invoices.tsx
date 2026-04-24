@@ -45,7 +45,7 @@ const Invoices = () => {
   const [searchParams] = useSearchParams();
   
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super-admin';
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
   
@@ -71,7 +71,7 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("invoiceNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(currentUserData?.preferredViewMode === 'list' ? 'list' : 'grid');
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -394,7 +394,7 @@ const Invoices = () => {
         ) : (
           viewMode === 'grid' ? (
             filteredInvoices.map((inv) => (
-              <div key={inv.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+              <div key={inv.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingInvoice(inv)}>
                 <div className="flex items-center gap-6">
                   <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                     <FileText className="h-6 w-6 text-muted-foreground" />
@@ -448,7 +448,7 @@ const Invoices = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-white"
-                        onClick={() => sendInvoiceEmail(inv)}
+                        onClick={(e) => { e.stopPropagation(); sendInvoiceEmail(inv); }}
                         disabled={isSending === inv.id}
                       >
                         <Send className={`h-4 w-4 ${isSending === inv.id ? 'animate-pulse' : ''}`} />
@@ -459,7 +459,7 @@ const Invoices = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-white"
-                        onClick={() => setEditingInvoice(inv)}
+                        onClick={(e) => { e.stopPropagation(); setEditingInvoice(inv); }}
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -468,7 +468,7 @@ const Invoices = () => {
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => downloadInvoice(inv)}
+                      onClick={(e) => { e.stopPropagation(); downloadInvoice(inv); }}
                     >
                       <Download className="h-5 w-5" />
                     </Button>
@@ -477,7 +477,7 @@ const Invoices = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(inv.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(inv.id); }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -502,7 +502,7 @@ const Invoices = () => {
                    </thead>
                    <tbody className="divide-y divide-white/5">
                      {filteredInvoices.map((inv) => (
-                       <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
+                       <tr key={inv.id} className="hover:bg-white/5 transition-colors cursor-pointer group" onClick={() => setEditingInvoice(inv)}>
                          <td className="p-4">
                            <div className="font-bold">#{inv.invoiceNumber || inv.id.slice(0, 6)}</div>
                          </td>

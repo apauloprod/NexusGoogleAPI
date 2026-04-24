@@ -22,7 +22,7 @@ interface MediaUploadProps {
 export const MediaUpload: React.FC<MediaUploadProps> = ({ jobId, onClose }) => {
   const { currentUserData, impersonatedUser } = React.useContext(AuthContext);
   const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
+  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager' || currentRole === 'super-admin';
 
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);

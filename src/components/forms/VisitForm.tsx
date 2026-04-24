@@ -67,7 +67,7 @@ export function VisitForm({ initialData, onSuccess, onCancel }: VisitFormProps) 
   const [customTasks, setCustomTasks] = useState<any[]>([]);
 
   const currentRole = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager';
+  const isManagerOrAdmin = currentRole === 'admin' || currentRole === 'manager' || currentRole === 'super-admin';
 
   useEffect(() => {
     if (!currentUserData?.businessId && !impersonatedUser?.businessId) return;

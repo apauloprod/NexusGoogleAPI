@@ -85,8 +85,8 @@ const Timesheets = () => {
     userId: ""
   });
 
-  const role = (impersonatedUser?.role || currentUserData?.role || 'team') as "admin" | "manager" | "team";
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const role = (impersonatedUser?.role || currentUserData?.role || 'team') as "admin" | "manager" | "team" | "super-admin";
+  const isManagerOrAdmin = role === 'admin' || role === 'manager' || role === 'super-admin';
   
   const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
   const hasAccess = isManagerOrAdmin || permissions.page_timesheets;
@@ -106,7 +106,7 @@ const Timesheets = () => {
     setHourlyRate(currentUserData.hourlyRate || 0);
 
     // Fetch team members for this business
-    if (role === 'admin' || role === 'manager') {
+    if (role === 'admin' || role === 'manager' || role === 'super-admin') {
       const qTeam = query(
         collection(db, "users"), 
         where("businessId", "==", businessId),
@@ -274,7 +274,7 @@ const Timesheets = () => {
     if (!user || (!currentUserData?.businessId && !impersonatedUser?.businessId)) return;
     const businessId = impersonatedUser?.businessId || currentUserData.businessId;
     try {
-      const isPrivileged = userRole === 'admin' || userRole === 'manager';
+      const isPrivileged = userRole === 'admin' || userRole === 'manager' || userRole === 'super-admin';
       const targetUserId = (isPrivileged && manualEntry.userId) ? manualEntry.userId : (impersonatedUser?.uid || user.uid);
       const targetUserDoc = await getDoc(doc(db, "users", targetUserId));
       const targetUserData = targetUserDoc.exists() ? targetUserDoc.data() : {};
@@ -390,7 +390,7 @@ const Timesheets = () => {
             Timesheets
           </h1>
           <p className="text-muted-foreground mt-1">
-            {userRole === 'admin' 
+            {(userRole === 'admin' || userRole === 'super-admin') 
               ? "Manage team hours and approve labor costs." 
               : "Track your work hours and submit for approval."}
           </p>
@@ -494,7 +494,7 @@ const Timesheets = () => {
                 <DialogTitle className="text-2xl font-bold tracking-tighter">Manual Timesheet Entry</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-4">
-                {(userRole === 'admin' || userRole === 'manager') && (
+                {(userRole === 'admin' || userRole === 'manager' || userRole === 'super-admin') && (
                   <div className="space-y-2">
                     <Label>Team Member</Label>
                     <Select value={manualEntry.userId} onValueChange={(v) => setManualEntry({...manualEntry, userId: v})}>
@@ -771,8 +771,10 @@ const Timesheets = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Recent Entries</h2>
             <div className="flex gap-2">
-               {userRole === 'admin' && (
-                 <Badge variant="outline" className="bg-white/5 border-white/10">Admin View</Badge>
+               {(userRole === 'admin' || userRole === 'super-admin') && (
+                 <Badge variant="outline" className={`bg-white/5 border-white/10 ${userRole === 'super-admin' ? 'text-emerald-500' : ''}`}>
+                   {userRole === 'super-admin' ? 'Super Admin View' : 'Admin View'}
+                 </Badge>
                )}
             </div>
           </div>

@@ -85,6 +85,34 @@ async function startServer() {
       };
 
       const docRef = await addDoc(collection(db, "requests"), formattedRequest);
+
+      // If it's a Nexus CRM inquiry or has direct email flag, notify super admin
+      if (resend && (businessId === "nexus-crm-id" || data._direct_email)) {
+        const targetEmail = data._direct_email || "apauloprod@gmail.com";
+        console.log(`[WEBHOOK] Sending notification email to ${targetEmail}`);
+        
+        await resend.emails.send({
+          from: "Nexus CRM <onboarding@resend.dev>",
+          to: targetEmail,
+          subject: `New Nexus CRM Inquiry: ${formattedRequest.name}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #111;">
+              <h2 style="font-size: 24px; font-weight: bold; tracking-tighter: -0.025em; border-bottom: 2px solid #EEE; padding-bottom: 12px;">New Inquiry Received</h2>
+              <div style="margin-top: 24px; space-y: 12px;">
+                <p><strong>Name:</strong> ${formattedRequest.name}</p>
+                <p><strong>Email:</strong> ${formattedRequest.email}</p>
+                <p><strong>Phone:</strong> ${formattedRequest.phone}</p>
+                <p><strong>Interest:</strong> ${data.interested_in || 'General Exploration'}</p>
+                <p><strong>Notes:</strong><br/> ${formattedRequest.notes}</p>
+              </div>
+              <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #EEE; font-size: 12px; color: #666;">
+                <p>Sent from your Nexus CRM Landing Page</p>
+              </div>
+            </div>
+          `
+        });
+      }
+
       res.json({ success: true, id: docRef.id });
     } catch (err: any) {
       console.error("[WEBHOOK ERROR]", err);

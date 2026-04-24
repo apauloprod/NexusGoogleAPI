@@ -93,7 +93,7 @@ export default function Overview() {
   }, [user, currentUserData?.businessId, impersonatedUser?.businessId]);
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super-admin';
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
 

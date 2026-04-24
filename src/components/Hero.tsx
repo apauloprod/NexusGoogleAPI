@@ -42,15 +42,15 @@ export const Hero = () => {
         transition={{ duration: 0.5, delay: 0.3 }}
         className="flex flex-col sm:flex-row gap-4"
       >
-        <Link to="/dashboard">
+        <a href="#contact">
           <Button size="lg" className="bg-white text-black hover:bg-white/90 rounded-full px-8 h-14 text-lg font-medium group">
-            Start Scaling Now
+            Get Started
             <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
           </Button>
-        </Link>
+        </a>
         <Link to="/dashboard">
           <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-lg font-medium border-white/10 hover:bg-white/5">
-            View Case Studies
+            Dashboard Access
           </Button>
         </Link>
       </motion.div>

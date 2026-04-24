@@ -56,10 +56,19 @@ const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("scheduledAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(currentUserData?.preferredViewMode === 'list' ? 'list' : 'grid');
+
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name[0].toUpperCase();
+  };
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'super-admin';
   const isManager = role === 'manager';
   const isManagerOrAdmin = isAdmin || isManager;
   
@@ -388,17 +397,20 @@ const Jobs = () => {
         ) : (
           viewMode === 'grid' ? (
             filteredJobs.map((job) => (
-              <div key={job.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+              <div key={job.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingJob(job)}>
                 <div className="flex items-center gap-6">
                   <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                     <CheckSquare className="h-6 w-6 text-muted-foreground" />
                   </div>
                   <div>
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-bold text-lg">
+                      <Link 
+                        to={`/dashboard/clients?search=${encodeURIComponent(job.clientName)}`}
+                        className="font-bold text-lg hover:text-cyan-400 transition-colors"
+                      >
                         {job.items?.[0]?.description ? `${job.items[0].description}${job.items.length > 1 ? ` (+${job.items.length - 1} more)` : ''} - ` : ''}
                         {job.clientName}
-                      </h3>
+                      </Link>
                       {getStatusBadge(job.status)}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
@@ -432,12 +444,12 @@ const Jobs = () => {
                             <div 
                               key={memberId} 
                               title={member?.displayName || member?.email || memberId}
-                              className="h-6 w-6 rounded-full border-2 border-black bg-white/10 flex items-center justify-center overflow-hidden"
+                              className="h-6 w-6 rounded-full border-2 border-black bg-white/10 flex items-center justify-center overflow-hidden text-[8px] font-black"
                             >
                               {member?.photoURL ? (
                                 <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                               ) : (
-                                <UserIcon className="h-3 w-3" />
+                                <span className="text-muted-foreground/50">{getInitials(member?.displayName || member?.email || memberId)}</span>
                               )}
                             </div>
                           );
@@ -485,7 +497,7 @@ const Jobs = () => {
                         variant="ghost" 
                         size="sm" 
                         className="text-xs gap-1 hover:text-emerald-500"
-                        onClick={() => convertToInvoice(job)}
+                        onClick={(e) => { e.stopPropagation(); convertToInvoice(job); }}
                         disabled={isConverting === job.id}
                       >
                         <FileText className="h-3 w-3" />
@@ -496,7 +508,7 @@ const Jobs = () => {
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => setViewingMediaJob(job)}
+                      onClick={(e) => { e.stopPropagation(); setViewingMediaJob(job); }}
                     >
                       <ImageIcon className="h-5 w-5" />
                     </Button>
@@ -505,7 +517,7 @@ const Jobs = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-white"
-                        onClick={() => setEditingJob(job)}
+                        onClick={(e) => { e.stopPropagation(); setEditingJob(job); }}
                       >
                         <ArrowUpRight className="h-5 w-5" />
                       </Button>
@@ -515,7 +527,7 @@ const Jobs = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(job.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(job.id); }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -540,7 +552,7 @@ const Jobs = () => {
                    </thead>
                    <tbody className="divide-y divide-white/5">
                      {filteredJobs.map((job) => (
-                       <tr key={job.id} className="hover:bg-white/5 transition-colors group">
+                       <tr key={job.id} className="hover:bg-white/5 transition-colors cursor-pointer group" onClick={() => setEditingJob(job)}>
                          <td className="p-4">
                            <div className="font-bold text-sm">
                              {job.items?.[0]?.description ? `${job.items[0].description}${job.items.length > 1 ? ` (+${job.items.length - 1} more)` : ''} - ` : ''}

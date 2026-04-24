@@ -40,7 +40,7 @@ const Team = () => {
   const navigate = useNavigate();
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager' || role === 'super-admin';
 
   const ensureDate = (val: any) => {
     if (!val) return null;
@@ -70,6 +70,15 @@ const Team = () => {
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [newMemberName, setNewMemberName] = useState("");
 
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name[0].toUpperCase();
+  };
+
   const addTeamMember = async () => {
     const businessId = impersonatedUser?.businessId || currentUserData?.businessId;
     if (!newMemberEmail || !newMemberName || !businessId) return;
@@ -85,6 +94,7 @@ const Team = () => {
           page_jobs: true,
           page_messages: true,
           page_timesheets: true,
+          can_self_assign: true,
         },
         createdAt: serverTimestamp()
       });
@@ -159,6 +169,7 @@ const Team = () => {
     { id: 'page_marketing', label: 'Marketing' },
     { id: 'page_expenses', label: 'Expenses' },
     { id: 'page_timesheets', label: 'Timesheets' },
+    { id: 'can_self_assign', label: 'Allow Self Assignment to Jobs' },
   ];
 
   const togglePermission = async (memberId: string, permissionId: string, current: boolean) => {
@@ -269,11 +280,11 @@ const Team = () => {
                       )}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-white/20">
+                        <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-white/20 text-[10px] font-black">
                           {member.photoURL ? (
                             <img src={member.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                           ) : (
-                            <UserIcon className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-muted-foreground/50">{getInitials(member.displayName || member.email)}</span>
                           )}
                         </div>
                         <div>
@@ -306,11 +317,11 @@ const Team = () => {
               <Card className="bg-black border-white/10 text-white rounded-[2rem] overflow-hidden">
                 <CardHeader>
                   <div className="flex items-center gap-4 mb-2">
-                    <div className="h-16 w-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center border border-white/10 shadow-xl overflow-hidden">
+                    <div className="h-16 w-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center border border-white/10 shadow-xl overflow-hidden text-xl font-black">
                        {selectedMember.photoURL ? (
                           <img src={selectedMember.photoURL} referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                         ) : (
-                          <UserIcon className="h-8 w-8 text-muted-foreground" />
+                          <span className="text-muted-foreground/50">{getInitials(selectedMember.displayName || selectedMember.email)}</span>
                         )}
                     </div>
                     <div>

@@ -9,6 +9,7 @@ import RequestForm from "./pages/RequestForm";
 import PublicQuoteApproval from "./pages/PublicQuoteApproval";
 import PublicPayment from "./pages/PublicPayment";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Toaster } from "sonner";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -96,6 +97,7 @@ export default function App() {
             <Route path="/dashboard/*" element={<Dashboard />} />
           </Routes>
         </Router>
+        <Toaster theme="dark" position="top-center" />
       </AuthContext.Provider>
     </ErrorBoundary>
   );

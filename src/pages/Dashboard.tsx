@@ -302,7 +302,7 @@ const Sidebar = ({
       <Separator className="my-6 bg-white/5 mx-4" />
       
       <div className="space-y-1">
-        {userRole === "super-admin" && (
+        {(userRole === "super-admin" || user?.email === "apauloprod@gmail.com") && (
           <SidebarItem 
             icon={Shield} 
             label="Super Admin" 
@@ -389,18 +389,14 @@ export default function Dashboard() {
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
       
+      const isSuperAdmin = user.email === "apauloprod@gmail.com";
+      const nexusBusinessId = "nexus-crm-id";
+
       if (!snap.exists()) {
-        // Check if user was invited (invited docs have email but no uid yet or different doc ID)
-        // Actually, invited users are currently created with random doc IDs.
-        // We search by email to see if they were pre-invited.
         const inviteQuery = query(collection(db, "users"), where("email", "==", user.email));
         const inviteSnap = await getDocs(inviteQuery);
         
-        const isSuperAdmin = user.email === "apauloprod@gmail.com";
-
         if (!inviteSnap.empty) {
-          // User was invited. Claim the record by copying data to a doc with their real UID.
-          // This ensures AuthContext.currentUserData (based on snap(doc(users, uid))) works.
           const inviteDoc = inviteSnap.docs[0];
           const inviteData = inviteDoc.data();
           
@@ -410,28 +406,36 @@ export default function Dashboard() {
             displayName: user.displayName || inviteData.displayName,
             photoURL: user.photoURL,
             updatedAt: serverTimestamp(),
-            // Ensure businessId exists
-            businessId: inviteData.businessId || user.uid
+            businessId: isSuperAdmin ? nexusBusinessId : (inviteData.businessId || user.uid),
+            businessName: isSuperAdmin ? "Nexus CRM" : (inviteData.businessName || ""),
+            role: isSuperAdmin ? "super-admin" : inviteData.role
           });
           
-          // Delete the temporary invite doc if it wasn't already the UID doc
           if (inviteDoc.id !== user.uid) {
             await deleteDoc(inviteDoc.ref);
           }
         } else {
-          // New independent business owner
           await setDoc(userRef, {
             email: user.email,
             displayName: user.displayName,
             photoURL: user.photoURL,
-            role: isSuperAdmin ? "admin" : "admin", // New users starting out are admins of their own business
-            businessId: user.uid, // Their own business
+            role: isSuperAdmin ? "super-admin" : "admin",
+            businessId: isSuperAdmin ? nexusBusinessId : user.uid,
+            businessName: isSuperAdmin ? "Nexus CRM" : "",
             createdAt: serverTimestamp()
           });
         }
-      } else if (!snap.data().businessId) {
-        // Legacy support: add businessId if missing
-        await updateDoc(userRef, { businessId: user.uid });
+      } else {
+        const data = snap.data();
+        if (isSuperAdmin && (data.businessId !== nexusBusinessId || data.role !== "super-admin")) {
+          await updateDoc(userRef, { 
+            businessId: nexusBusinessId, 
+            role: "super-admin",
+            businessName: "Nexus CRM"
+          });
+        } else if (!data.businessId) {
+          await updateDoc(userRef, { businessId: user.uid });
+        }
       }
     };
     checkUser();

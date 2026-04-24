@@ -38,7 +38,7 @@ const Payments = () => {
   const [searchParams] = useSearchParams();
 
   const role = impersonatedUser?.role || currentUserData?.role || 'team';
-  const isManagerOrAdmin = role === 'admin' || role === 'manager';
+  const isManagerOrAdmin = role === 'admin' || role === 'manager' || role === 'super-admin';
 
   const permissions = impersonatedUser?.permissions || currentUserData?.permissions || {};
   const hasAccess = isManagerOrAdmin || permissions.page_payments;
@@ -54,7 +54,7 @@ const Payments = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(currentUserData?.preferredViewMode === 'list' ? 'list' : 'grid');
 
   const handleDelete = async (id: string) => {
     if (!isManagerOrAdmin) {
@@ -203,7 +203,7 @@ const Payments = () => {
         ) : (
           viewMode === 'grid' ? (
             filteredPayments.map((payment) => (
-              <div key={payment.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group">
+              <div key={payment.id} className="p-6 rounded-2xl glass border-white/5 flex items-center justify-between hover:border-white/10 transition-colors group cursor-pointer" onClick={() => setEditingPayment(payment)}>
                 <div className="flex items-center gap-6">
                   <div className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                     <CreditCard className="h-6 w-6 text-muted-foreground" />
@@ -238,11 +238,16 @@ const Payments = () => {
                       variant="ghost" 
                       size="icon" 
                       className="text-muted-foreground hover:text-white"
-                      onClick={() => setEditingPayment(payment)}
+                      onClick={(e) => { e.stopPropagation(); setEditingPayment(payment); }}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-muted-foreground hover:text-white"
+                      onClick={(e) => { e.stopPropagation(); }}
+                    >
                       <ArrowUpRight className="h-5 w-5" />
                     </Button>
                     {isManagerOrAdmin && (
@@ -250,7 +255,7 @@ const Payments = () => {
                         variant="ghost" 
                         size="icon" 
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(payment.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(payment.id); }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -275,7 +280,7 @@ const Payments = () => {
                    </thead>
                    <tbody className="divide-y divide-white/5">
                      {filteredPayments.map((payment) => (
-                       <tr key={payment.id} className="hover:bg-white/5 transition-colors group">
+                       <tr key={payment.id} className="hover:bg-white/5 transition-colors cursor-pointer group" onClick={() => setEditingPayment(payment)}>
                          <td className="p-4">
                            <div className="font-bold text-sm">{payment.clientName}</div>
                          </td>
